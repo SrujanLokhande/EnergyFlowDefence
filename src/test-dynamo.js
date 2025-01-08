@@ -5,9 +5,9 @@ async function testDatabase() {
 
     // Test 1: Update scores for testing
     console.log("Testing score updates...");
-    await gameDB.updateScore("testPlayer1", 1000);
-    await gameDB.updateScore("testPlayer2", 1500);
-    await gameDB.updateScore("testPlayer1", 2000); // Update player1's score
+    await gameDB.updateScore("testPlayer4", 1000);
+    await gameDB.updateScore("testPlayer5", 1500);
+    await gameDB.updateScore("testPlayer4", 2000); // Update player1's score
 
     // Test 2: Get player's latest score
     console.log("\nTesting get player score...");
