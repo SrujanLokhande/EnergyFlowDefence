@@ -1,19 +1,19 @@
 {
-  "name": "energyflowdefence",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "name": "energydefence",
+  "private": true,
+  "version": "0.0.0",
   "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.5"
+  },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.724.0",
     "@aws-sdk/lib-dynamodb": "^3.724.0",
-    "@aws-sdk/util-dynamodb": "^3.724.0",
     "pixi.js": "^8.6.6"
   }
 }
