@@ -1,6 +1,7 @@
 import { Application, Container } from 'pixi.js';
 import { GridSystem } from '../systems/gridSystem.js';
 import { EnergyCore } from '../components/energyCore.js';
+import { Player } from '../components/player.js';
 import { GRID_CONFIG } from '../config/gameConfig.js';
 
 export class Game {
@@ -27,13 +28,15 @@ export class Game {
         this.gameContainer = new Container();
         this.app.stage.addChild(this.gameContainer);
 
-        // Initialize systems
+        // Initialize systems and components
         this.gridSystem = new GridSystem();
-        this.gameContainer.addChild(this.gridSystem.container);
-
-        // Initialize components
         this.energyCore = new EnergyCore();
+        this.player = new Player();
+
+        // Add components to container in correct order
+        this.gameContainer.addChild(this.gridSystem.container);
         this.gameContainer.addChild(this.energyCore.container);
+        this.gameContainer.addChild(this.player.container);
 
         // Center the view initially
         this.centerView();
@@ -65,60 +68,43 @@ export class Game {
     update(deltaTime) {
         const time = this.app.ticker.lastTime / 1000;
         this.energyCore.update(deltaTime, time);
+
+        this.player.update();
+
+        // Update camera to follow player
+        this.updateCamera();
+    }
+
+    updateCamera() {
+        const playerPos = this.player.getPosition();
+        const bounds = this.gridSystem.getBounds();
+        
+        // Calculate the target camera position (centered on player)
+        const targetX = (window.innerWidth / 2) - playerPos.x;
+        const targetY = (window.innerHeight / 2) - playerPos.y;
+
+        // Add bounds to camera movement
+        const minX = window.innerWidth - bounds.width;
+        const maxX = 0;
+        const minY = window.innerHeight - bounds.height;
+        const maxY = 0;
+
+        // Update container position with bounds
+        this.gameContainer.position.x = Math.max(minX, Math.min(maxX, targetX));
+        this.gameContainer.position.y = Math.max(minY, Math.min(maxY, targetY));
     }
 
     setupInteraction() {
         this.app.stage.eventMode = 'static';
         
-        let isDragging = false;
-        let lastPosition = null;
-
-        this.app.stage.on('pointerdown', (event) => {
-            isDragging = true;
-            lastPosition = event.global.clone();
-        });
-
-        this.app.stage.on('pointermove', (event) => {
-            if (isDragging && lastPosition) {
-                const newPosition = event.global;
-                const dx = newPosition.x - lastPosition.x;
-                const dy = newPosition.y - lastPosition.y;
-
-                // Calculate new position
-                const newX = this.gameContainer.position.x + dx;
-                const newY = this.gameContainer.position.y + dy;
-
-                // Get grid bounds
-                const bounds = this.gridSystem.getBounds();
-                
-                // Limit panning to keep grid visible
-                const minX = -(bounds.width - window.innerWidth + 100);
-                const maxX = 100;
-                const minY = -(bounds.height - window.innerHeight + 100);
-                const maxY = 100;
-
-                // Apply bounded position
-                this.gameContainer.position.x = Math.min(maxX, Math.max(minX, newX));
-                this.gameContainer.position.y = Math.min(maxY, Math.max(minY, newY));
-
-                lastPosition = newPosition.clone();
-            }
-        });
-
-        this.app.stage.on('pointerup', () => {
-            isDragging = false;
-            lastPosition = null;
-        });
-
+        // Keep click handling for future tower placement
         this.app.stage.on('pointertap', (event) => {
-            if (!isDragging) {
-                const worldPos = {
-                    x: event.global.x - this.gameContainer.position.x,
-                    y: event.global.y - this.gameContainer.position.y
-                };
-                const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
-                console.log(`Grid coordinates: ${gridPos.x}, ${gridPos.y}`);
-            }
+            const worldPos = {
+                x: event.global.x - this.gameContainer.position.x,
+                y: event.global.y - this.gameContainer.position.y
+            };
+            const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
+            console.log(`Grid coordinates: ${gridPos.x}, ${gridPos.y}`);
         });
     }
 }
