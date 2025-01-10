@@ -17,3 +17,15 @@ export const CORE_CONFIG = {
     PULSE_MAGNITUDE: 0.05,
     MAX_HEALTH: 100
 };
+
+export const TOWER_CONFIG = {
+    COST: 100,
+    BASE_DAMAGE: 10,
+    BASE_RANGE: 3,
+    BASE_ATTACK_SPEED: 1,
+    ENERGY_CONNECTION_RANGE: 4, // Maximum distance for energy connection
+    PLACEMENT_RULES: {
+        MIN_DISTANCE_FROM_CORE: 2,
+        MIN_DISTANCE_BETWEEN_TOWERS: 1
+    }
+};

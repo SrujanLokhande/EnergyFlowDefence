@@ -1,5 +1,7 @@
 import { Application, Container } from 'pixi.js';
 import { GridSystem } from '../systems/gridSystem.js';
+import { TowerSystem } from '../systems/towerSystem.js';
+import { EnemySystem } from '../systems/enemySystem.js';
 import { EnergyCore } from '../components/energyCore.js';
 import { Player } from '../components/player.js';
 import { GRID_CONFIG } from '../config/gameConfig.js';
@@ -32,9 +34,13 @@ export class Game {
         this.gridSystem = new GridSystem();
         this.energyCore = new EnergyCore();
         this.player = new Player();
+        this.towerSystem = new TowerSystem(this.gridSystem, this.energyCore);
+        this.enemySystem = new EnemySystem(this.gridSystem, this.energyCore);
 
         // Add components to container in correct order
         this.gameContainer.addChild(this.gridSystem.container);
+        this.gameContainer.addChild(this.towerSystem.container);
+        this.gameContainer.addChild(this.enemySystem.container);
         this.gameContainer.addChild(this.energyCore.container);
         this.gameContainer.addChild(this.player.container);
 
@@ -68,10 +74,9 @@ export class Game {
     update(deltaTime) {
         const time = this.app.ticker.lastTime / 1000;
         this.energyCore.update(deltaTime, time);
-
         this.player.update();
-
-        // Update camera to follow player
+        this.enemySystem.update();
+        this.towerSystem.update(time, this.enemySystem.getEnemies());
         this.updateCamera();
     }
 
@@ -97,14 +102,66 @@ export class Game {
     setupInteraction() {
         this.app.stage.eventMode = 'static';
         
-        // Keep click handling for future tower placement
+        // Add debug key for spawning enemies
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'e') {
+                this.enemySystem.debugSpawnEnemy();
+            }
+        });
+        let hoveredTower = null;
+        
+        // Handle mouse move for tower range preview
+        this.app.stage.on('pointermove', (event) => {
+            const worldPos = {
+                x: event.global.x - this.gameContainer.position.x,
+                y: event.global.y - this.gameContainer.position.y
+            };
+            const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
+            
+            // Hide previous tower range if exists
+            if (hoveredTower) {
+                hoveredTower.showRange(false);
+                hoveredTower = null;
+            }
+
+            // Check if we're hovering over a tower
+            const towerKey = `${gridPos.x},${gridPos.y}`;
+            const tower = this.towerSystem.towers.get(towerKey);
+            if (tower) {
+                tower.showRange(true);
+                hoveredTower = tower;
+            }
+
+            // Show placement preview if valid position
+            this.towerSystem.showPlacementPreview(
+                gridPos.x,
+                gridPos.y,
+                this.towerSystem.canPlaceTower(gridPos.x, gridPos.y)
+            );
+        });
+
+        // Handle click for tower placement
         this.app.stage.on('pointertap', (event) => {
             const worldPos = {
                 x: event.global.x - this.gameContainer.position.x,
                 y: event.global.y - this.gameContainer.position.y
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
-            console.log(`Grid coordinates: ${gridPos.x}, ${gridPos.y}`);
+            
+            // Attempt to place tower
+            const tower = this.towerSystem.placeTower(gridPos.x, gridPos.y);
+            if (tower) {
+                console.log(`Tower placed at grid position: ${gridPos.x}, ${gridPos.y}`);
+            }
+        });
+
+        // Handle pointer leaving the stage
+        this.app.stage.on('pointerleave', () => {
+            if (hoveredTower) {
+                hoveredTower.showRange(false);
+                hoveredTower = null;
+            }
+            this.towerSystem.hidePlacementPreview();
         });
     }
 }
