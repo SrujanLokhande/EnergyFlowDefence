@@ -20,7 +20,7 @@ export const CORE_CONFIG = {
 
 export const TOWER_CONFIG = {
     COST: 100,
-    BASE_DAMAGE: 10,
+    BASE_DAMAGE: 50,
     BASE_RANGE: 3,
     BASE_ATTACK_SPEED: 1,
     ENERGY_CONNECTION_RANGE: 4, // Maximum distance for energy connection

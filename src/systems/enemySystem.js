@@ -1,6 +1,8 @@
 import { Container } from 'pixi.js';
 import { Enemy } from '../components/enemy.js';
 import { GRID_CONFIG } from '../config/gameConfig.js';
+import { eventManager } from '../managers/eventManager.js';
+import { GameEvents } from '../config/eventTypes.js';
 
 export class EnemySystem {
     constructor(gridSystem, energyCore) {
@@ -9,6 +11,26 @@ export class EnemySystem {
         this.energyCore = energyCore;
         this.enemies = new Set();
         this.spawnPoints = this.generateSpawnPoints();
+
+        // Subscribe to relevant events
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Listen for enemy death events
+        eventManager.subscribe(GameEvents.ENEMY_DIED, (data) => {
+            this.removeEnemy(data.enemy);
+        });
+
+        // Listen for enemy reaching core
+        eventManager.subscribe(GameEvents.ENEMY_REACHED_CORE, (data) => {
+            this.handleEnemyReachedCore(data);
+        });
+
+        // Listen for game over to clear enemies
+        eventManager.subscribe(GameEvents.GAME_OVER, () => {
+            this.clearAllEnemies();
+        });
     }
 
     generateSpawnPoints() {
@@ -50,6 +72,12 @@ export class EnemySystem {
         return enemy;
     }
 
+    handleEnemyReachedCore(data) {
+        const { enemy } = data;
+        this.energyCore.takeDamage(enemy.value); // Use enemy value as damage
+        this.removeEnemy(enemy);
+    }
+
     update() {
         const corePosition = {
             x: this.energyCore.container.position.x,
@@ -58,6 +86,10 @@ export class EnemySystem {
 
         // Update each enemy
         for (const enemy of this.enemies) {
+            if (enemy.isDead()) {
+                continue; // Skip dead enemies, they'll be removed via event
+            }
+
             // Move towards core
             enemy.moveTowards(corePosition.x, corePosition.y);
             enemy.update();
@@ -71,23 +103,32 @@ export class EnemySystem {
 
             // If enemy reaches core
             if (distance < GRID_CONFIG.CELL_SIZE) {
-                this.energyCore.takeDamage(10);
-                this.removeEnemy(enemy);
+                enemy.reachedCore(); // This will emit the ENEMY_REACHED_CORE event
             }
         }
     }
 
     removeEnemy(enemy) {
-        this.enemies.delete(enemy);
-        enemy.destroy();
+        if (this.enemies.has(enemy)) {
+            this.enemies.delete(enemy);
+            enemy.destroy();
+        }
+    }
+
+    clearAllEnemies() {
+        for (const enemy of this.enemies) {
+            enemy.destroy();
+        }
+        this.enemies.clear();
     }
 
     getEnemies() {
         return Array.from(this.enemies);
     }
 
-    // Debug method to spawn enemies manually
     debugSpawnEnemy() {
-        this.spawnEnemy();
+        const enemy = this.spawnEnemy();
+        console.log('Debug: Enemy spawned at', enemy.getPosition());
+        return enemy;
     }
 }

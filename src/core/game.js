@@ -5,9 +5,20 @@ import { EnemySystem } from '../systems/enemySystem.js';
 import { EnergyCore } from '../components/energyCore.js';
 import { Player } from '../components/player.js';
 import { GRID_CONFIG } from '../config/gameConfig.js';
+import { TOWER_CONFIG } from '../config/gameConfig.js';
+import { eventManager } from '../managers/eventManager.js';
+import { GameEvents } from '../config/eventTypes.js';
 
 export class Game {
     constructor() {
+        this.gameState = {
+            isPlaying: false,
+            isPaused: false,
+            score: 0,
+            wave: 0,
+            resources: 500 // Starting resources
+        };
+
         this.initGame();
     }
 
@@ -31,6 +42,24 @@ export class Game {
         this.app.stage.addChild(this.gameContainer);
 
         // Initialize systems and components
+        this.setupSystems();
+        this.setupEventListeners();
+        
+        // Center the view initially
+        this.centerView();
+
+        // Setup game loop and interactions
+        this.app.ticker.add(this.update.bind(this));
+        this.setupInteraction();
+        
+        // Handle window resize
+        window.addEventListener('resize', this.handleResize.bind(this));
+
+        // Start the game
+        this.startGame();
+    }
+
+    setupSystems() {
         this.gridSystem = new GridSystem();
         this.energyCore = new EnergyCore();
         this.player = new Player();
@@ -43,27 +72,79 @@ export class Game {
         this.gameContainer.addChild(this.enemySystem.container);
         this.gameContainer.addChild(this.energyCore.container);
         this.gameContainer.addChild(this.player.container);
+    }
 
-        // Center the view initially
-        this.centerView();
+    setupEventListeners() {
+        // Core events
+        eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
+            this.handleGameOver();
+        });
 
-        // Setup game loop
-        this.app.ticker.add(this.update.bind(this));
+        // Enemy events
+        eventManager.subscribe(GameEvents.ENEMY_DIED, (data) => {
+            this.handleEnemyDeath(data);
+        });
 
-        // Setup interaction
-        this.setupInteraction();
-        
-        // Handle window resize
-        window.addEventListener('resize', this.handleResize.bind(this));
+        // Tower events
+        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {
+            this.handleTowerPlaced(data);
+        });
+
+        eventManager.subscribe(GameEvents.TOWER_PLACEMENT_FAILED, (data) => {
+            console.log('Tower placement failed:', data.reason);
+        });
+
+        // Resource events
+        eventManager.subscribe(GameEvents.RESOURCES_CHANGED, (data) => {
+            // Handle UI updates or other resource change consequences
+            console.log('Resources updated:', data);
+        });
+    }
+
+    handleEnemyDeath(data) {
+        // Update score and resources
+        this.gameState.score += data.value;
+        this.addResources(data.value, 'enemy_killed');
+    }
+
+    handleTowerPlaced(data) {
+        // Deduct tower cost from resources
+        this.addResources(-data.cost, 'tower_placed');
+    }
+
+    addResources(amount, type) {
+        const previousAmount = this.gameState.resources;
+        this.gameState.resources += amount;
+
+        // Emit event after updating the state
+        eventManager.emit(GameEvents.RESOURCES_CHANGED, {
+            previous: previousAmount,
+            current: this.gameState.resources,
+            change: amount,
+            type: type
+        });
+    }
+
+    handleGameOver() {
+        this.gameState.isPlaying = false;
+        eventManager.emit(GameEvents.GAME_OVER, {
+            score: this.gameState.score,
+            wave: this.gameState.wave
+        });
+    }
+
+    startGame() {
+        this.gameState.isPlaying = true;
+        this.gameState.wave = 1;
+        eventManager.emit(GameEvents.GAME_STARTED, {
+            initialResources: this.gameState.resources
+        });
     }
 
     centerView() {
         const bounds = this.gridSystem.getBounds();
-        
-        // Calculate position to center the grid
         const x = (window.innerWidth - bounds.width) / 2;
         const y = (window.innerHeight - bounds.height) / 2;
-        
         this.gameContainer.position.set(x, y);
     }
 
@@ -72,7 +153,11 @@ export class Game {
     }
 
     update(deltaTime) {
+        if (!this.gameState.isPlaying || this.gameState.isPaused) return;
+
         const time = this.app.ticker.lastTime / 1000;
+        
+        // Update all systems
         this.energyCore.update(deltaTime, time);
         this.player.update();
         this.enemySystem.update();
@@ -84,47 +169,52 @@ export class Game {
         const playerPos = this.player.getPosition();
         const bounds = this.gridSystem.getBounds();
         
-        // Calculate the target camera position (centered on player)
         const targetX = (window.innerWidth / 2) - playerPos.x;
         const targetY = (window.innerHeight / 2) - playerPos.y;
 
-        // Add bounds to camera movement
         const minX = window.innerWidth - bounds.width;
         const maxX = 0;
         const minY = window.innerHeight - bounds.height;
         const maxY = 0;
 
-        // Update container position with bounds
         this.gameContainer.position.x = Math.max(minX, Math.min(maxX, targetX));
         this.gameContainer.position.y = Math.max(minY, Math.min(maxY, targetY));
     }
 
     setupInteraction() {
         this.app.stage.eventMode = 'static';
-        
-        // Add debug key for spawning enemies
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'e') {
-                this.enemySystem.debugSpawnEnemy();
-            }
-        });
         let hoveredTower = null;
         
+        // Debug key for spawning enemies
+        window.addEventListener('keydown', (e) => {
+            if (!this.gameState.isPlaying) return;
+
+            switch(e.key.toLowerCase()) {
+                case 'e':
+                    console.log('Spawning enemy');
+                    this.enemySystem.debugSpawnEnemy();
+                    break;
+                case 'p':
+                    this.togglePause();
+                    break;
+            }
+        });
+
         // Handle mouse move for tower range preview
         this.app.stage.on('pointermove', (event) => {
+            if (!this.gameState.isPlaying) return;
+
             const worldPos = {
                 x: event.global.x - this.gameContainer.position.x,
                 y: event.global.y - this.gameContainer.position.y
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
             
-            // Hide previous tower range if exists
             if (hoveredTower) {
                 hoveredTower.showRange(false);
                 hoveredTower = null;
             }
 
-            // Check if we're hovering over a tower
             const towerKey = `${gridPos.x},${gridPos.y}`;
             const tower = this.towerSystem.towers.get(towerKey);
             if (tower) {
@@ -132,26 +222,32 @@ export class Game {
                 hoveredTower = tower;
             }
 
-            // Show placement preview if valid position
+            const canPlace = this.towerSystem.canPlaceTower(gridPos.x, gridPos.y);
             this.towerSystem.showPlacementPreview(
                 gridPos.x,
                 gridPos.y,
-                this.towerSystem.canPlaceTower(gridPos.x, gridPos.y)
+                canPlace && this.gameState.resources >= TOWER_CONFIG.COST
             );
         });
 
         // Handle click for tower placement
         this.app.stage.on('pointertap', (event) => {
+            if (!this.gameState.isPlaying) return;
+
             const worldPos = {
                 x: event.global.x - this.gameContainer.position.x,
                 y: event.global.y - this.gameContainer.position.y
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
             
-            // Attempt to place tower
-            const tower = this.towerSystem.placeTower(gridPos.x, gridPos.y);
-            if (tower) {
-                console.log(`Tower placed at grid position: ${gridPos.x}, ${gridPos.y}`);
+            if (this.gameState.resources >= TOWER_CONFIG.COST) {
+                this.towerSystem.placeTower(gridPos.x, gridPos.y);
+            } else {
+                eventManager.emit(GameEvents.TOWER_PLACEMENT_FAILED, {
+                    reason: 'insufficient_resources',
+                    required: TOWER_CONFIG.COST,
+                    current: this.gameState.resources
+                });
             }
         });
 
@@ -163,5 +259,20 @@ export class Game {
             }
             this.towerSystem.hidePlacementPreview();
         });
+    }
+
+    togglePause() {
+        this.gameState.isPaused = !this.gameState.isPaused;
+        eventManager.emit(
+            this.gameState.isPaused ? GameEvents.GAME_PAUSED : GameEvents.GAME_RESUMED
+        );
+    }
+
+    cleanup() {
+        // Cleanup all systems
+        this.towerSystem.destroy();
+        this.enemySystem.clearAllEnemies();
+        this.gameContainer.destroy();
+        this.app.destroy();
     }
 }
