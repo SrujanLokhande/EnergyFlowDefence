@@ -74,6 +74,12 @@ export class Health {
         this.updateHealthBar();
     }
 
+    setMaxHealth(amount) {
+        this.maxHealth = Math.max(1, amount);
+        this.health = Math.min(this.health, this.maxHealth);
+        this.updateHealthBar();
+    }
+
     setHealth(amount) {
         this.health = Math.min(this.maxHealth, Math.max(0, amount));
         this.updateHealthBar();

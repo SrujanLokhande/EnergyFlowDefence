@@ -11,6 +11,15 @@ export class Movement {
             maxY: GRID_CONFIG.HEIGHT * GRID_CONFIG.CELL_SIZE - GRID_CONFIG.CELL_SIZE / 2
         };
         this.velocity = { x: 0, y: 0 };
+        this.updateRotation = false;
+    }
+
+    setSpeed(speed) {
+        this.speed = Math.max(0, speed);
+    }
+
+    getSpeed() {
+        return this.speed;
     }
 
     // Update position based on velocity
@@ -76,5 +85,10 @@ export class Movement {
     stop() {
         this.velocity.x = 0;
         this.velocity.y = 0;
+    }
+
+    // Set movement bounds
+    setBounds(bounds) {
+        this.bounds = { ...this.bounds, ...bounds };
     }
 }

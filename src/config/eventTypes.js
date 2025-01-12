@@ -1,10 +1,18 @@
-export const GameEvents = {
+export const GameEvents = {    
     // Enemy related events
+    ENEMY_CREATED: 'enemy:created',
     ENEMY_SPAWNED: 'enemy:spawned',
     ENEMY_DIED: 'enemy:died',
     ENEMY_MOVED: 'enemy:moved',
     ENEMY_DAMAGED: 'enemy:damaged',
+    ENEMY_DESTROYED: 'enemy:destroyed', 
     ENEMY_REACHED_CORE: 'enemy:reachedCore',
+    ENEMY_INITIALIZED: 'enemy:initialized',
+    ENEMY_CREATION_REQUESTED: 'enemy:creationRequested',
+    ENEMY_CREATION_FAILED: 'enemy:creationFailed',
+    ENEMY_CONFIGURE_HEALTH: 'enemy:configureHealth',
+    ENEMY_CONFIGURE_MOVEMENT: 'enemy:configureMovement',
+    ENEMY_CONFIGURE_VISUALS: 'enemy:configureVisuals',    
 
     // Tower related events
     TOWER_PLACED: 'tower:placed',
@@ -38,5 +46,17 @@ export const GameEvents = {
 
     // Player events
     PLAYER_MOVED: 'player:moved',
-    PLAYER_ACTION: 'player:action'
+    PLAYER_ACTION: 'player:action',
+
+    // State events
+    STATE_CHANGED: 'state:changed',
+    MENU_ENTERED: 'menu:entered',
+    SCORE_UPDATED: 'score:updated',
+
+    // Health related events
+    HEALTH_INITIALIZED: 'health:initialized',
+    HEALTH_CHANGED: 'health:changed',
+    HEALTH_DEPLETED: 'health:depleted',
+    HEALTH_SET: 'health:set',
+    MAX_HEALTH_CHANGED: 'health:maxChanged',
 };

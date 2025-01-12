@@ -4,29 +4,23 @@ import { TowerSystem } from '../systems/towerSystem.js';
 import { EnemySystem } from '../systems/enemySystem.js';
 import { EnergyCore } from '../components/energyCore.js';
 import { Player } from '../components/player.js';
-import { GRID_CONFIG } from '../config/gameConfig.js';
-import { TOWER_CONFIG } from '../config/gameConfig.js';
+import { GRID_CONFIG, TOWER_CONFIG } from '../config/gameConfig.js';
 import { eventManager } from '../managers/eventManager.js';
+import { GameStateManager, GameStates } from '../managers/gameStateManager.js';
 import { GameEvents } from '../config/eventTypes.js';
 
 export class Game {
     constructor() {
-        this.gameState = {
-            isPlaying: false,
-            isPaused: false,
-            score: 0,
-            wave: 0,
-            resources: 500 // Starting resources
-        };
-
+        this.stateManager = new GameStateManager();
         this.initGame();
     }
 
     async initGame() {
+        // Set initial loading state
+        this.stateManager.setState('LOADING');
+
         // Create a new application
         this.app = new Application();
-
-        // Initialize the application
         await this.app.init({ 
             background: GRID_CONFIG.BACKGROUND_COLOR,
             resizeTo: window,
@@ -55,8 +49,8 @@ export class Game {
         // Handle window resize
         window.addEventListener('resize', this.handleResize.bind(this));
 
-        // Start the game
-        this.startGame();
+        // Move to menu state after initialization
+        this.stateManager.setState('MENU');
     }
 
     setupSystems() {
@@ -77,7 +71,9 @@ export class Game {
     setupEventListeners() {
         // Core events
         eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
-            this.handleGameOver();
+            this.stateManager.setState(GameStates.GAME_OVER, {
+                reason: 'core_destroyed'
+            });
         });
 
         // Enemy events
@@ -90,70 +86,72 @@ export class Game {
             this.handleTowerPlaced(data);
         });
 
-        eventManager.subscribe(GameEvents.TOWER_PLACEMENT_FAILED, (data) => {
-            console.log('Tower placement failed:', data.reason);
+        // State change events
+        eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
+            this.handleStateChange(data);
         });
+    }
 
-        // Resource events
-        eventManager.subscribe(GameEvents.RESOURCES_CHANGED, (data) => {
-            // Handle UI updates or other resource change consequences
-            console.log('Resources updated:', data);
-        });
+    handleStateChange(data) {
+        console.log(`Game state changed from ${data.previousState} to ${data.currentState}`);
+        
+        // Handle specific state transitions
+        switch(data.currentState) {
+            case GameStates.PLAYING:
+                this.resumeGameSystems();
+                break;
+            case GameStates.PAUSED:
+                this.pauseGameSystems();
+                break;
+            case GameStates.GAME_OVER:
+                this.handleGameOver();
+                break;
+        }
     }
 
     handleEnemyDeath(data) {
-        // Update score and resources
-        this.gameState.score += data.value;
-        this.addResources(data.value, 'enemy_killed');
+        this.stateManager.updateScore(data.value);
+        this.stateManager.updateResources(data.value);
     }
 
     handleTowerPlaced(data) {
-        // Deduct tower cost from resources
-        this.addResources(-data.cost, 'tower_placed');
-    }
-
-    addResources(amount, type) {
-        const previousAmount = this.gameState.resources;
-        this.gameState.resources += amount;
-
-        // Emit event after updating the state
-        eventManager.emit(GameEvents.RESOURCES_CHANGED, {
-            previous: previousAmount,
-            current: this.gameState.resources,
-            change: amount,
-            type: type
-        });
-    }
-
-    handleGameOver() {
-        this.gameState.isPlaying = false;
-        eventManager.emit(GameEvents.GAME_OVER, {
-            score: this.gameState.score,
-            wave: this.gameState.wave
-        });
+        this.stateManager.updateResources(-data.cost);
     }
 
     startGame() {
-        this.gameState.isPlaying = true;
-        this.gameState.wave = 1;
-        eventManager.emit(GameEvents.GAME_STARTED, {
-            initialResources: this.gameState.resources
-        });
+        this.stateManager.setState(GameStates.PLAYING);
     }
 
-    centerView() {
-        const bounds = this.gridSystem.getBounds();
-        const x = (window.innerWidth - bounds.width) / 2;
-        const y = (window.innerHeight - bounds.height) / 2;
-        this.gameContainer.position.set(x, y);
+    pauseGame() {
+        if (this.stateManager.isPlaying()) {
+            this.stateManager.setState(GameStates.PAUSED);
+        }
     }
 
-    handleResize() {
-        this.centerView();
+    resumeGame() {
+        if (this.stateManager.isPaused()) {
+            this.stateManager.setState(GameStates.PLAYING);
+        }
+    }
+
+    pauseGameSystems() {
+        // Pause any animations, timers, or systems that need to stop
+        this.app.ticker.stop();
+    }
+
+    resumeGameSystems() {
+        // Resume any animations, timers, or systems
+        this.app.ticker.start();
+    }
+
+    handleGameOver() {
+        // Clean up or reset systems as needed
+        this.enemySystem.clearAllEnemies();
+        // Could add game over screen or other cleanup here
     }
 
     update(deltaTime) {
-        if (!this.gameState.isPlaying || this.gameState.isPaused) return;
+        if (!this.stateManager.isPlaying()) return;
 
         const time = this.app.ticker.lastTime / 1000;
         
@@ -163,9 +161,21 @@ export class Game {
         this.enemySystem.update();
         this.towerSystem.update(time, this.enemySystem.getEnemies());
         this.updateCamera();
+
+        // Check for wave completion
+        if (this.checkWaveComplete()) {
+            this.stateManager.setState(GameStates.WAVE_COMPLETE);
+        }
+    }
+
+    checkWaveComplete() {
+        // Add wave completion logic here
+        return false;
     }
 
     updateCamera() {
+        if (!this.player) return;
+        
         const playerPos = this.player.getPosition();
         const bounds = this.gridSystem.getBounds();
         
@@ -181,28 +191,40 @@ export class Game {
         this.gameContainer.position.y = Math.max(minY, Math.min(maxY, targetY));
     }
 
-    setupInteraction() {
+     setupInteraction() {
         this.app.stage.eventMode = 'static';
         let hoveredTower = null;
         
-        // Debug key for spawning enemies
+        // Debug keys for game controls
         window.addEventListener('keydown', (e) => {
-            if (!this.gameState.isPlaying) return;
-
             switch(e.key.toLowerCase()) {
-                case 'e':
-                    console.log('Spawning enemy');
-                    this.enemySystem.debugSpawnEnemy();
+                case ' ': // Space key
+                    if (this.stateManager.getCurrentState() === 'MENU') {
+                        console.log('Starting game from menu');
+                        this.stateManager.setState('PLAYING');
+                    }
                     break;
+
+                case 'e':
+                    if (this.stateManager.isPlaying()) {
+                        console.log('Spawning enemy');
+                        this.enemySystem.debugSpawnEnemy();
+                    }
+                    break;
+
                 case 'p':
-                    this.togglePause();
+                    if (this.stateManager.isPaused()) {
+                        this.resumeGame();
+                    } else if (this.stateManager.isPlaying()) {
+                        this.pauseGame();
+                    }
                     break;
             }
         });
 
         // Handle mouse move for tower range preview
         this.app.stage.on('pointermove', (event) => {
-            if (!this.gameState.isPlaying) return;
+            if (!this.stateManager.isPlaying()) return;
 
             const worldPos = {
                 x: event.global.x - this.gameContainer.position.x,
@@ -210,6 +232,11 @@ export class Game {
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
             
+            if (!gridPos) {
+                this.towerSystem.hidePlacementPreview();
+                return;
+            }
+
             if (hoveredTower) {
                 hoveredTower.showRange(false);
                 hoveredTower = null;
@@ -222,17 +249,18 @@ export class Game {
                 hoveredTower = tower;
             }
 
+            const stateData = this.stateManager.getStateData();
             const canPlace = this.towerSystem.canPlaceTower(gridPos.x, gridPos.y);
             this.towerSystem.showPlacementPreview(
                 gridPos.x,
                 gridPos.y,
-                canPlace && this.gameState.resources >= TOWER_CONFIG.COST
+                canPlace && stateData.resources >= TOWER_CONFIG.COST
             );
         });
 
         // Handle click for tower placement
         this.app.stage.on('pointertap', (event) => {
-            if (!this.gameState.isPlaying) return;
+            if (!this.stateManager.isPlaying()) return;
 
             const worldPos = {
                 x: event.global.x - this.gameContainer.position.x,
@@ -240,13 +268,14 @@ export class Game {
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
             
-            if (this.gameState.resources >= TOWER_CONFIG.COST) {
+            const stateData = this.stateManager.getStateData();
+            if (stateData.resources >= TOWER_CONFIG.COST) {
                 this.towerSystem.placeTower(gridPos.x, gridPos.y);
             } else {
                 eventManager.emit(GameEvents.TOWER_PLACEMENT_FAILED, {
                     reason: 'insufficient_resources',
                     required: TOWER_CONFIG.COST,
-                    current: this.gameState.resources
+                    current: stateData.resources
                 });
             }
         });
@@ -261,15 +290,18 @@ export class Game {
         });
     }
 
-    togglePause() {
-        this.gameState.isPaused = !this.gameState.isPaused;
-        eventManager.emit(
-            this.gameState.isPaused ? GameEvents.GAME_PAUSED : GameEvents.GAME_RESUMED
-        );
+    centerView() {
+        const bounds = this.gridSystem.getBounds();
+        const x = (window.innerWidth - bounds.width) / 2;
+        const y = (window.innerHeight - bounds.height) / 2;
+        this.gameContainer.position.set(x, y);
+    }
+
+    handleResize() {
+        this.centerView();
     }
 
     cleanup() {
-        // Cleanup all systems
         this.towerSystem.destroy();
         this.enemySystem.clearAllEnemies();
         this.gameContainer.destroy();
