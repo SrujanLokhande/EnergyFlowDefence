@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { GRID_CONFIG, TOWER_CONFIG } from '../config/gameConfig.js';
+import { GRID_CONFIG } from '../config/gameConfig.js';
 import { isDamageable } from '../interfaces/damageable.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
@@ -8,23 +8,55 @@ export class Tower {
     constructor(gridX, gridY) {
         this.container = new Container();
         this.gridPosition = { x: gridX, y: gridY };
+        this.id = `tower-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Default values (will be configured by factory)
         this.isConnected = false;
-        this.range = TOWER_CONFIG.BASE_RANGE;
-        this.damage = TOWER_CONFIG.BASE_DAMAGE;
-        this.attackSpeed = TOWER_CONFIG.BASE_ATTACK_SPEED;
+        this.type = 'BASIC';
+        this.range = 3;
+        this.damage = 20;
+        this.attackSpeed = 1;
         this.lastAttackTime = 0;
         this.currentTarget = null;
         this.projectiles = new Set();
+        this.level = 1;
         
+        // Create tower visuals
         this.createTower();
         this.updatePosition();
 
-        // Emit tower created event
-        eventManager.emit(GameEvents.TOWER_PLACED, {
+        // Setup event listeners
+        this.setupEventListeners();
+
+        // Emit tower initialized event
+        eventManager.emit(GameEvents.TOWER_INITIALIZED, {
             tower: this,
-            position: this.gridPosition,
-            cost: TOWER_CONFIG.COST
+            id: this.id,
+            position: this.gridPosition
         });
+    }
+
+    setupEventListeners() {
+        // Listen for tower configuration
+        eventManager.subscribe(GameEvents.TOWER_CONFIGURE, (data) => {
+            if (data.tower === this) {
+                this.configureTower(data.config);
+            }
+        });
+    }
+
+    configureTower(config) {
+        if (config.damage) this.damage = config.damage;
+        if (config.range) {
+            this.range = config.range;
+            this.updateRangeIndicator();
+        }
+        if (config.attackSpeed) this.attackSpeed = config.attackSpeed;
+        if (config.color) {
+            this.turret.clear()
+                .circle(0, 0, GRID_CONFIG.CELL_SIZE * 0.25)
+                .fill({ color: config.color });
+        }
     }
 
     createTower() {
@@ -43,15 +75,8 @@ export class Tower {
             .fill({ color: 0x3498db });
 
         // Range indicator
-        this.rangeIndicator = new Graphics()
-            .circle(0, 0, this.range * GRID_CONFIG.CELL_SIZE)
-            .fill({ color: 0x3498db, alpha: 0.1 })
-            .setStrokeStyle({
-                width: 2,
-                color: 0x3498db,
-                alpha: 0.3
-            })
-            .stroke();
+        this.rangeIndicator = new Graphics();
+        this.updateRangeIndicator();
         this.rangeIndicator.visible = false;
 
         // Projectiles container
@@ -61,20 +86,32 @@ export class Tower {
         this.container.addChild(this.rangeIndicator, this.base, this.turret, this.projectilesContainer);
     }
 
+    updateRangeIndicator() {
+        this.rangeIndicator.clear()
+            .circle(0, 0, this.range * GRID_CONFIG.CELL_SIZE)
+            .fill({ color: 0x3498db, alpha: 0.1 })
+            .setStrokeStyle({
+                width: 2,
+                color: 0x3498db,
+                alpha: 0.3
+            })
+            .stroke();
+    }
+
     setConnected(connected) {
         const wasConnected = this.isConnected;
         this.isConnected = connected;
         
-        // Visual feedback for connection status
-        const color = connected ? 0x3498db : 0x95a5a6;
-        this.turret.clear()
-            .circle(0, 0, GRID_CONFIG.CELL_SIZE * 0.25)
-            .fill({ color });
+        // Update visuals based on connection status
+        if (this.turret) {
+            this.turret.alpha = connected ? 1 : 0.5;
+        }
 
         // Emit event only if connection status changed
         if (wasConnected !== connected) {
             eventManager.emit(GameEvents.TOWER_CONNECTION_CHANGED, {
                 tower: this,
+                id: this.id,
                 isConnected: connected,
                 position: this.gridPosition
             });
@@ -93,6 +130,12 @@ export class Tower {
         this.projectilesContainer.addChild(projectile);
         this.projectiles.add(projectile);
 
+        eventManager.emit(GameEvents.TOWER_PROJECTILE_CREATED, {
+            tower: this,
+            id: this.id,
+            target: targetEnemy
+        });
+
         return projectile;
     }
 
@@ -108,11 +151,9 @@ export class Tower {
         const rangeInPixels = this.range * GRID_CONFIG.CELL_SIZE;
 
         for (const enemy of enemies) {
-            // Skip dead enemies
             if (enemy.isDead()) continue;
 
             const enemyPos = enemy.getPosition();
-            // Skip if position is null (enemy might be destroyed)
             if (!enemyPos) continue;
 
             const distance = Math.sqrt(
@@ -127,19 +168,20 @@ export class Tower {
         }
 
         if (this.currentTarget !== nearestEnemy) {
-            // If current target is dead or out of range, clear it
-            if (this.currentTarget && (this.currentTarget.isDead() || !nearestEnemy)) {
+            if (this.currentTarget) {
                 eventManager.emit(GameEvents.TOWER_TARGET_LOST, {
                     tower: this,
-                    reason: this.currentTarget.isDead() ? 'target_died' : 'target_out_of_range'
+                    id: this.id,
+                    previousTarget: this.currentTarget
                 });
             }
 
             this.currentTarget = nearestEnemy;
-            
+
             if (nearestEnemy) {
                 eventManager.emit(GameEvents.TOWER_TARGET_ACQUIRED, {
                     tower: this,
+                    id: this.id,
                     target: nearestEnemy,
                     distance: nearestDistance
                 });
@@ -165,6 +207,7 @@ export class Tower {
         
         eventManager.emit(GameEvents.TOWER_ATTACKED, {
             tower: this,
+            id: this.id,
             target: this.currentTarget,
             damage: this.damage
         });
@@ -202,6 +245,7 @@ export class Tower {
                     projectile.targetEnemy.takeDamage(this.damage);
                     eventManager.emit(GameEvents.TOWER_HIT_TARGET, {
                         tower: this,
+                        id: this.id,
                         target: projectile.targetEnemy,
                         damage: this.damage,
                         position: targetPos
@@ -225,6 +269,7 @@ export class Tower {
                 this.currentTarget = null;
                 eventManager.emit(GameEvents.TOWER_TARGET_LOST, {
                     tower: this,
+                    id: this.id,
                     reason: 'disconnected'
                 });
             }
@@ -235,7 +280,7 @@ export class Tower {
 
         if (this.currentTarget && !this.currentTarget.isDead()) {
             const targetPos = this.currentTarget.getPosition();
-            if (targetPos) {  // Check if position is valid
+            if (targetPos) {
                 const towerPos = this.getPosition();
                 this.turret.rotation = Math.atan2(
                     targetPos.y - towerPos.y,
@@ -243,13 +288,13 @@ export class Tower {
                 );
                 this.attack(time);
             } else {
-                // Target has no valid position, clear it
                 this.currentTarget = null;
             }
         }
 
         this.updateProjectiles();
     }
+
     showRange(show = true) {
         this.rangeIndicator.visible = show;
     }
@@ -277,10 +322,22 @@ export class Tower {
         };
     }
 
+    getLevelInfo() {
+        return {
+            level: this.level,
+            damage: this.damage,
+            range: this.range,
+            attackSpeed: this.attackSpeed
+        };
+    }
+
     destroy() {
         eventManager.emit(GameEvents.TOWER_DESTROYED, {
+            id: this.id,
             position: this.gridPosition,
-            wasConnected: this.isConnected
+            wasConnected: this.isConnected,
+            type: this.type,
+            level: this.level
         });
         this.container.destroy();
     }

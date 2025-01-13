@@ -3,6 +3,7 @@ import { Tower } from '../components/tower.js';
 import { TOWER_CONFIG, GRID_CONFIG } from '../config/gameConfig.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
+import { TowerFactory } from '../factory/towerFactory.js';
 
 export class TowerSystem {
     constructor(gridSystem, energyCore) {
@@ -12,6 +13,7 @@ export class TowerSystem {
         this.towers = new Map(); // Grid position string to Tower instance
         this.energyBeams = new Graphics();
         this.placementPreview = new Graphics();
+        this.towerFactory = new TowerFactory();
         
         // Add visual layers in correct order
         this.container.addChild(this.energyBeams);
@@ -21,25 +23,42 @@ export class TowerSystem {
     }
 
     setupEventListeners() {
-        // Listen for core destruction
-        eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
-            this.handleCoreDestroyed();
-        });
-
-        // Listen for tower events
-        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {
-            if (data) this.updateEnergyConnections();
-        });
-
-        eventManager.subscribe(GameEvents.TOWER_DESTROYED, (data) => {
-            if (data) this.updateEnergyConnections();
-        });
-
-        // Listen for game state changes
-        eventManager.subscribe(GameEvents.GAME_OVER, () => {
-            this.handleCoreDestroyed();
+        // Listen for tower placement requests
+        eventManager.subscribe(GameEvents.TOWER_CREATION_REQUESTED, (data) => {
+            console.log('Tower creation requested:', data);
+            if (this.canPlaceTower(data.gridX, data.gridY)) {
+                this.createTower(data.type, data.gridX, data.gridY);
+            }
         });
     }
+
+    addTower(tower) {
+        console.log('Adding tower to system:', tower);
+        const posKey = `${tower.gridPosition.x},${tower.gridPosition.y}`;
+        this.towers.set(posKey, tower);
+        this.container.addChild(tower.container);
+        
+        // Only emit tower placed event here
+        eventManager.emit(GameEvents.TOWER_PLACED, {
+            tower,
+            position: tower.gridPosition,
+            type: tower.type,
+            cost: this.towerFactory.getTowerCost(tower.type)
+        });
+        
+        // Update energy connections after adding tower
+        this.updateEnergyConnections();
+    }
+
+    createTower(type, gridX, gridY) {
+        const tower = this.towerFactory.createTower(type, gridX, gridY);
+        if (tower) {
+            this.addTower(tower);
+            return tower;
+        }
+        return null;
+    }
+
 
     canPlaceTower(gridX, gridY) {
         const posKey = `${gridX},${gridY}`;
@@ -86,7 +105,7 @@ export class TowerSystem {
         
         this.updateEnergyConnections();
         return tower;
-    }
+    }    
 
     updateEnergyConnections() {
         // Clear existing energy beams
@@ -194,6 +213,21 @@ export class TowerSystem {
 
     hidePlacementPreview() {
         this.placementPreview.clear();
+    }
+    
+    getTowerAt(gridX, gridY) {
+        const posKey = `${gridX},${gridY}`;
+        return this.towers.get(posKey);
+    }
+
+    // Add these methods to TowerSystem class
+    getTowerCost(type) {
+        return this.towerFactory.getTowerCost(type);        
+    }
+
+    getUpgradeCost(gridX, gridY) {
+        const tower = this.getTowerAt(gridX, gridY);
+        return tower ? this.towerFactory.getUpgradeCost(tower) : 0;
     }
 
     handleCoreDestroyed() {

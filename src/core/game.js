@@ -8,10 +8,16 @@ import { GRID_CONFIG, TOWER_CONFIG } from '../config/gameConfig.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameStateManager, GameStates } from '../managers/gameStateManager.js';
 import { GameEvents } from '../config/eventTypes.js';
+import { TowerTypes } from '../factory/towerFactory.js';
 
 export class Game {
     constructor() {
         this.stateManager = new GameStateManager();
+        // Initialize game state
+        this.gameState = {
+            resources: 10,  // Starting resources
+            score: 0
+        };
         this.initGame();
     }
 
@@ -90,6 +96,21 @@ export class Game {
         eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
             this.handleStateChange(data);
         });
+        
+        // Listen for network updates
+        eventManager.subscribe(GameEvents.TOWER_NETWORK_UPDATED, (data) => {
+            console.log(`Tower network updated: ${data.connectedCount}/${data.totalTowers} towers connected`);
+        });
+
+        // Listen for resource changes
+        eventManager.subscribe(GameEvents.RESOURCES_CHANGED, (data) => {
+            console.log(`Resources changed from ${data.previous} to ${data.current}`);
+        });
+
+        // Listen for tower initialization
+        eventManager.subscribe(GameEvents.TOWER_INITIALIZED, (data) => {
+            console.log('New tower initialized:', data);
+        });
     }
 
     handleStateChange(data) {
@@ -98,6 +119,7 @@ export class Game {
         // Handle specific state transitions
         switch(data.currentState) {
             case GameStates.PLAYING:
+                console.log('Entering PLAYING state');
                 this.resumeGameSystems();
                 break;
             case GameStates.PAUSED:
@@ -115,10 +137,17 @@ export class Game {
     }
 
     handleTowerPlaced(data) {
-        this.stateManager.updateResources(-data.cost);
+        // Update resources when tower is placed
+        this.gameState.resources -= data.cost;
+        eventManager.emit(GameEvents.RESOURCES_CHANGED, {
+            previous: this.gameState.resources + data.cost,
+            current: this.gameState.resources,
+            change: -data.cost,
+            type: 'tower_placement'
+        });
     }
-
     startGame() {
+        console.log('Starting game...');
         this.stateManager.setState(GameStates.PLAYING);
     }
 
@@ -191,34 +220,68 @@ export class Game {
         this.gameContainer.position.y = Math.max(minY, Math.min(maxY, targetY));
     }
 
-     setupInteraction() {
+    setupInteraction() {
         this.app.stage.eventMode = 'static';
         let hoveredTower = null;
-        
-        // Debug keys for game controls
-        window.addEventListener('keydown', (e) => {
-            switch(e.key.toLowerCase()) {
-                case ' ': // Space key
-                    if (this.stateManager.getCurrentState() === 'MENU') {
-                        console.log('Starting game from menu');
-                        this.stateManager.setState('PLAYING');
-                    }
-                    break;
+        let selectedTowerType = TowerTypes.BASIC;
 
-                case 'e':
-                    if (this.stateManager.isPlaying()) {
+        // Global key listener - outside of any state check
+        window.addEventListener('keydown', (e) => {
+            console.log('Key pressed:', e.key);
+            console.log('Current game state:', this.stateManager.getCurrentState());
+
+            // Handle space bar for state changes
+            if (e.key === ' ') {
+                console.log('Space pressed');
+                const currentState = this.stateManager.getCurrentState();
+                console.log('Current state before space:', currentState);
+                
+                if (currentState === 'MENU') {
+                    console.log('Attempting to start game from menu');
+                    this.stateManager.setState('PLAYING');
+                }
+            }
+
+            // Only process other game controls if in PLAYING state
+            if (this.stateManager.isPlaying()) {
+                switch(e.key.toLowerCase()) {
+                    case 'e':
                         console.log('Spawning enemy');
                         this.enemySystem.debugSpawnEnemy();
-                    }
-                    break;
-
-                case 'p':
-                    if (this.stateManager.isPaused()) {
-                        this.resumeGame();
-                    } else if (this.stateManager.isPlaying()) {
-                        this.pauseGame();
-                    }
-                    break;
+                        break;
+                    case 'p':
+                        if (this.stateManager.isPaused()) {
+                            this.resumeGame();
+                        } else {
+                            this.pauseGame();
+                        }
+                        break;
+                    case '1':
+                        selectedTowerType = TowerTypes.BASIC;
+                        console.log('Selected Basic Tower');
+                        break;
+                    case '2':
+                        selectedTowerType = TowerTypes.RAPID;
+                        console.log('Selected Rapid Tower');
+                        break;
+                    case '3':
+                        selectedTowerType = TowerTypes.SNIPER;
+                        console.log('Selected Sniper Tower');
+                        break;
+                    case '4':
+                        selectedTowerType = TowerTypes.AOE;
+                        console.log('Selected AOE Tower');
+                        break;
+                    case 'u':
+                        if (hoveredTower) {
+                            eventManager.emit(GameEvents.TOWER_UPGRADE_REQUESTED, {
+                                tower: hoveredTower,
+                                gridX: hoveredTower.gridPosition.x,
+                                gridY: hoveredTower.gridPosition.y
+                            });
+                        }
+                        break;
+                }
             }
         });
 
@@ -242,8 +305,7 @@ export class Game {
                 hoveredTower = null;
             }
 
-            const towerKey = `${gridPos.x},${gridPos.y}`;
-            const tower = this.towerSystem.towers.get(towerKey);
+            const tower = this.towerSystem.getTowerAt(gridPos.x, gridPos.y);
             if (tower) {
                 tower.showRange(true);
                 hoveredTower = tower;
@@ -251,10 +313,12 @@ export class Game {
 
             const stateData = this.stateManager.getStateData();
             const canPlace = this.towerSystem.canPlaceTower(gridPos.x, gridPos.y);
+            const towerCost = this.towerSystem.getTowerCost(selectedTowerType);
+            
             this.towerSystem.showPlacementPreview(
                 gridPos.x,
                 gridPos.y,
-                canPlace && stateData.resources >= TOWER_CONFIG.COST
+                canPlace && stateData.resources >= towerCost
             );
         });
 
@@ -267,14 +331,19 @@ export class Game {
                 y: event.global.y - this.gameContainer.position.y
             };
             const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
-            
             const stateData = this.stateManager.getStateData();
-            if (stateData.resources >= TOWER_CONFIG.COST) {
-                this.towerSystem.placeTower(gridPos.x, gridPos.y);
+            const towerCost = this.towerSystem.towerFactory.getTowerCost(selectedTowerType);
+
+            if (stateData.resources >= towerCost) {
+                eventManager.emit(GameEvents.TOWER_CREATION_REQUESTED, {
+                    type: selectedTowerType,
+                    gridX: gridPos.x,
+                    gridY: gridPos.y
+                });
             } else {
                 eventManager.emit(GameEvents.TOWER_PLACEMENT_FAILED, {
                     reason: 'insufficient_resources',
-                    required: TOWER_CONFIG.COST,
+                    required: towerCost,
                     current: stateData.resources
                 });
             }
