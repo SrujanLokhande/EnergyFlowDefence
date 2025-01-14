@@ -17,12 +17,16 @@ export class GameStateManager {
         this.previousState = null;
         this.stateData = {
             score: 0,
-            wave: 0,
-            resources: 100,
+            wave: 1,
+            // Start with 500 for testing:
+            resources: 500,
             isPaused: false
         };
 
-        // State-specific handlers
+        // Add tower event handling
+        this.setupTowerEventListeners();        
+
+        // Each state can have "enter" and "exit" methods
         this.stateHandlers = {
             [GameStates.MENU]: {
                 enter: () => this.handleMenuEnter(),
@@ -45,15 +49,27 @@ export class GameStateManager {
                 exit: () => this.handleWaveCompleteExit()
             },
             [GameStates.GAME_OVER]: {
-                enter: () => this.handleGameOverEnter(),
+                enter: (data) => this.handleGameOverEnter(data),
                 exit: () => this.handleGameOverExit()
             }
         };
     }
 
+    setupTowerEventListeners() {
+        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {
+            console.log(`[GameStateManager] Handling tower placement.`);
+            const success = this.updateResources(-data.cost);
+            if (success) {
+                console.log(`Resources updated. New total: ${this.stateData.resources}`);
+            } else {
+                console.warn('Insufficient resources for tower placement!');
+            }
+        });
+    }
+
     // Transition to a new state
     setState(newState, data = {}) {
-        // Convert state to uppercase to match GameStates enum
+        // Convert to uppercase to match the enum
         const stateKey = newState.toUpperCase();
         if (!Object.values(GameStates).includes(stateKey)) {
             console.error(`Invalid game state: ${newState}`);
@@ -62,12 +78,12 @@ export class GameStateManager {
 
         console.log(`Transitioning from ${this.currentState} to ${stateKey}`);
 
-        // Exit current state
+        // Exit old state
         if (this.stateHandlers[this.currentState]?.exit) {
             this.stateHandlers[this.currentState].exit();
         }
 
-        // Update state tracking
+        // Update state
         this.previousState = this.currentState;
         this.currentState = stateKey;
 
@@ -76,7 +92,7 @@ export class GameStateManager {
             this.stateHandlers[stateKey].enter(data);
         }
 
-        // Emit state change event
+        // Emit a valid event from eventTypes.js
         eventManager.emit(GameEvents.STATE_CHANGED, {
             previousState: this.previousState,
             currentState: this.currentState,
@@ -89,31 +105,29 @@ export class GameStateManager {
         console.log('Entering Menu State');
         eventManager.emit(GameEvents.MENU_ENTERED);
     }
-
     handleMenuExit() {
         console.log('Exiting Menu State');
     }
 
     handleLoadingEnter() {
         console.log('Entering Loading State');
-        // Initialize game resources
-        this.stateData.resources = 100;
+        // You can reset or set resources here if desired
+        // this.stateData.resources = 500; 
         this.stateData.score = 0;
         this.stateData.wave = 1;
     }
-
     handleLoadingExit() {
         console.log('Exiting Loading State');
     }
 
     handlePlayingEnter() {
         console.log('Entering Playing State');
+        // Optionally emit GAME_STARTED
         eventManager.emit(GameEvents.GAME_STARTED, {
             resources: this.stateData.resources,
             wave: this.stateData.wave
         });
     }
-
     handlePlayingExit() {
         console.log('Exiting Playing State');
     }
@@ -123,27 +137,29 @@ export class GameStateManager {
         this.stateData.isPaused = true;
         eventManager.emit(GameEvents.GAME_PAUSED);
     }
-
     handlePausedExit() {
         console.log('Exiting Paused State');
         this.stateData.isPaused = false;
         eventManager.emit(GameEvents.GAME_RESUMED);
     }
 
-    handleWaveCompleteEnter(data) {
-        console.log('Wave Complete');
-        this.stateData.wave++;
-        eventManager.emit(GameEvents.WAVE_COMPLETED, {
-            wave: this.stateData.wave - 1,
-            nextWave: this.stateData.wave,
-            score: this.stateData.score
-        });
+    handleWaveCompleteEnter() {
+        console.log('Entering Wave Complete State');
+        const waveBonus = Math.floor(this.stateData.wave * 50);
+        this.updateScore(waveBonus);
+        this.updateResources(waveBonus);
+        
+        console.log(`Wave ${this.stateData.wave} bonus awarded: ${waveBonus}`);
     }
 
     handleWaveCompleteExit() {
-        eventManager.emit(GameEvents.WAVE_STARTED, {
-            wave: this.stateData.wave
-        });
+        console.log('Exiting Wave Complete State');
+        this.stateData.wave++; // Increment wave counter when leaving WAVE_COMPLETE state
+        console.log(`Prepared for wave ${this.stateData.wave}`);
+    }
+
+    isWaveComplete() {
+        return this.currentState === GameStates.WAVE_COMPLETE;
     }
 
     handleGameOverEnter(data) {
@@ -154,31 +170,26 @@ export class GameStateManager {
             ...data
         });
     }
-
     handleGameOverExit() {
-        // Reset game state for new game
+        // Reset or keep data if you want to restart
         this.stateData.score = 0;
         this.stateData.wave = 1;
-        this.stateData.resources = 100;
+        this.stateData.resources = 500;
     }
 
     // Utility methods
     getCurrentState() {
         return this.currentState;
     }
-
     getPreviousState() {
         return this.previousState;
     }
-
     isPlaying() {
         return this.currentState === GameStates.PLAYING;
     }
-
     isPaused() {
         return this.currentState === GameStates.PAUSED;
     }
-
     getStateData() {
         return { ...this.stateData };
     }
@@ -190,12 +201,28 @@ export class GameStateManager {
             change: amount
         });
     }
-
     updateResources(amount) {
-        this.stateData.resources += amount;
+        console.log(`[GameStateManager] Updating resources:`, {
+            currentResources: this.stateData.resources,
+            changeAmount: amount,
+            newTotal: this.stateData.resources + amount,
+            stackTrace: new Error().stack
+        });
+        
+        const newAmount = this.stateData.resources + amount;
+        if (newAmount < 0) {
+            console.warn('[GameStateManager] Attempted to set negative resources:', newAmount);
+            return false;
+        }
+        
+        this.stateData.resources = newAmount;
+        
         eventManager.emit(GameEvents.RESOURCES_CHANGED, {
             resources: this.stateData.resources,
             change: amount
         });
+        
+        return true;
     }
+
 }

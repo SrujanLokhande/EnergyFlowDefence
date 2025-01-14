@@ -2,24 +2,28 @@ import { Application, Container } from 'pixi.js';
 import { GridSystem } from '../systems/gridSystem.js';
 import { TowerSystem } from '../systems/towerSystem.js';
 import { EnemySystem } from '../systems/enemySystem.js';
-import { EnergyCore } from '../components/energyCore.js';
+import { EnergyCore } from '../components/core/energyCore.js';
 import { Player } from '../components/player.js';
-import { GRID_CONFIG, TOWER_CONFIG } from '../config/gameConfig.js';
+import { TowerUI } from '../components/towerUI.js';
+import { WaveManager } from '../managers/waveManager.js'; 
+import { GRID_CONFIG } from '../config/gameConfig.js';
 import { eventManager } from '../managers/eventManager.js';
+import { UIManager } from '../managers/uiManager.js';
 import { GameStateManager, GameStates } from '../managers/gameStateManager.js';
 import { GameEvents } from '../config/eventTypes.js';
-import { TowerTypes } from '../factory/towerFactory.js';
+import { TowerTypes } from '../config/towerConfig.js';
+import { DEBUG_CONFIG } from '../config/debugConfig.js';
+import { ENEMY_TYPES } from '../config/enemyConfig.js';
+
+
 
 export class Game {
     constructor() {
-        this.stateManager = new GameStateManager();
-        // Initialize game state
-        this.gameState = {
-            resources: 10,  // Starting resources
-            score: 0
-        };
-        this.initGame();
-    }
+        this.stateManager = new GameStateManager();         
+        this.debug = DEBUG_CONFIG;         
+        this.initGame();        
+        this.setupEventListeners();
+    }  
 
     async initGame() {
         // Set initial loading state
@@ -59,12 +63,34 @@ export class Game {
         this.stateManager.setState('MENU');
     }
 
+    setupUI() {
+        this.uiManager = new UIManager(this.stateManager);
+    }
+
     setupSystems() {
         this.gridSystem = new GridSystem();
         this.energyCore = new EnergyCore();
         this.player = new Player();
         this.towerSystem = new TowerSystem(this.gridSystem, this.energyCore);
         this.enemySystem = new EnemySystem(this.gridSystem, this.energyCore);
+        this.uiManager = new UIManager(this.app, this.stateManager);
+        this.towerUI = new TowerUI(this.towerSystem);     
+
+
+        // Initialize WaveManager with configuration
+        this.waveManager = new WaveManager(
+            this.enemySystem,
+            this.stateManager,
+            {
+                baseEnemiesPerWave: 5,
+                enemiesPerWaveGrowth: 2,
+                spawnIntervalMs: 1500,
+                batchSize: 2,
+                waveCountdownMs: 5000,
+                bossWaveInterval: 5,
+                difficultyScaling: 1.2  // New parameter for progressive difficulty
+            }
+        );
 
         // Add components to container in correct order
         this.gameContainer.addChild(this.gridSystem.container);
@@ -72,80 +98,135 @@ export class Game {
         this.gameContainer.addChild(this.enemySystem.container);
         this.gameContainer.addChild(this.energyCore.container);
         this.gameContainer.addChild(this.player.container);
+        this.app.stage.addChild(this.uiManager.container);
+        this.uiManager.hudLayer.addChild(this.towerUI.container);
+        
     }
 
     setupEventListeners() {
+
+        if (this.debug.LOG_EVENTS) {
+            // Debug event logging
+            eventManager.subscribe('*', (data) => {
+                const event = data.type || 'unknown';
+                console.group(`Event: ${event}`);
+                console.log('Data:', data);
+                console.log('State:', this.stateManager.getCurrentState());
+                console.groupEnd();
+            });
+        }
+
+        if (!this.towerPlacedCallback) {
+            this.towerPlacedCallback = (data) => {
+                console.log(`[Game] Tower placed event handled.`);
+                // Do not handle resource deduction here
+            };
+            eventManager.subscribe(GameEvents.TOWER_PLACED, this.towerPlacedCallback);
+        }
+
+        // Enemy combat events
+        eventManager.subscribe(GameEvents.ENEMY_DAMAGED, (data) => {
+            console.log(`Enemy ${data.id} took ${data.amount} damage. Health: ${data.currentHealth}`);
+        });
+        
         // Core events
         eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
             this.stateManager.setState(GameStates.GAME_OVER, {
                 reason: 'core_destroyed'
             });
         });
-
+    
         // Enemy events
         eventManager.subscribe(GameEvents.ENEMY_DIED, (data) => {
             this.handleEnemyDeath(data);
         });
-
-        // Tower events
-        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {
-            this.handleTowerPlaced(data);
-        });
-
-        // State change events
+    
+        // Game state events
         eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
+            if (data.currentState === GameStates.PLAYING) {
+                if (this.stateManager.getStateData().wave === 1) {
+                    console.log('Starting first wave');
+                    eventManager.emit(GameEvents.WAVE_START_REQUESTED, { wave: 1 });
+                }
+            }
             this.handleStateChange(data);
         });
-        
-        // Listen for network updates
-        eventManager.subscribe(GameEvents.TOWER_NETWORK_UPDATED, (data) => {
-            console.log(`Tower network updated: ${data.connectedCount}/${data.totalTowers} towers connected`);
+    
+        // Wave events
+        eventManager.subscribe(GameEvents.WAVE_STARTED, (data) => {
+            console.log(`Wave ${data.wave} started!`, data.composition);
+            
+            // Update state data
+            const stateData = this.stateManager.getStateData();
+            stateData.currentWave = data.wave;
+            
+            // Ensure we're in PLAYING state when wave starts
+            if (this.stateManager.getCurrentState() !== GameStates.PLAYING) {
+                this.stateManager.setState(GameStates.PLAYING);
+            }
         });
-
-        // Listen for resource changes
-        eventManager.subscribe(GameEvents.RESOURCES_CHANGED, (data) => {
-            console.log(`Resources changed from ${data.previous} to ${data.current}`);
+    
+        eventManager.subscribe(GameEvents.WAVE_COMPLETED, (data) => {
+            console.log(`Wave ${data.wave} completed! Next wave: ${data.nextWave}`);
+            
+            // Only transition to WAVE_COMPLETE if we're not already there
+            if (this.stateManager.getCurrentState() !== GameStates.WAVE_COMPLETE) {
+                this.stateManager.setState(GameStates.WAVE_COMPLETE);
+            }
         });
-
-        // Listen for tower initialization
-        eventManager.subscribe(GameEvents.TOWER_INITIALIZED, (data) => {
-            console.log('New tower initialized:', data);
+    
+        eventManager.subscribe(GameEvents.WAVE_COUNTDOWN_STARTED, (data) => {
+            console.log(`Starting countdown to wave ${data.nextWave}. Time: ${data.timeMs}ms`);
+            // You could update UI here to show countdown
+        });
+    
+        eventManager.subscribe(GameEvents.WAVE_ENEMY_SPAWNED, (data) => {
+            console.log(`Spawned enemy type: ${data.type} in wave ${data.wave}`);
+        });
+    
+        // Debug logs for state changes
+        eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
+            console.log(`Game state changed: ${data.previousState} -> ${data.currentState}`);
         });
     }
 
     handleStateChange(data) {
         console.log(`Game state changed from ${data.previousState} to ${data.currentState}`);
         
-        // Handle specific state transitions
         switch(data.currentState) {
             case GameStates.PLAYING:
                 console.log('Entering PLAYING state');
                 this.resumeGameSystems();
                 break;
+                
             case GameStates.PAUSED:
                 this.pauseGameSystems();
                 break;
+                
+            case GameStates.WAVE_COMPLETE:
+                console.log('Entering WAVE_COMPLETE state');
+                // Additional wave complete logic if needed
+                break;
+                
             case GameStates.GAME_OVER:
                 this.handleGameOver();
                 break;
         }
     }
-
     handleEnemyDeath(data) {
         this.stateManager.updateScore(data.value);
         this.stateManager.updateResources(data.value);
+        console.log(`Enemy defeated! Value: ${data.value}`);
     }
 
     handleTowerPlaced(data) {
-        // Update resources when tower is placed
-        this.gameState.resources -= data.cost;
-        eventManager.emit(GameEvents.RESOURCES_CHANGED, {
-            previous: this.gameState.resources + data.cost,
-            current: this.gameState.resources,
-            change: -data.cost,
-            type: 'tower_placement'
-        });
+        // Deduct the tower cost from your GameStateManager's resource count
+        this.stateManager.updateResources(-data.cost);    
+        
+        const newResources = this.stateManager.getStateData().resources;
+        console.log(`Tower placed, cost: ${data.cost}, remaining resources: ${newResources}`);
     }
+
     startGame() {
         console.log('Starting game...');
         this.stateManager.setState(GameStates.PLAYING);
@@ -173,28 +254,37 @@ export class Game {
         this.app.ticker.start();
     }
 
+   
     handleGameOver() {
         // Clean up or reset systems as needed
         this.enemySystem.clearAllEnemies();
-        // Could add game over screen or other cleanup here
+        if (this.waveManager) {
+            this.waveManager.cleanup();
+        }
+        console.log('Game Over - Systems cleaned up');
     }
 
     update(deltaTime) {
         if (!this.stateManager.isPlaying()) return;
-
+    
         const time = this.app.ticker.lastTime / 1000;
         
-        // Update all systems
+        // Only log debug info every LOG_FREQUENCY frames
+        if (this.debug.ENEMY_DEBUG || this.debug.TOWER_DEBUG) {
+            this.debug.FRAME_COUNT = (this.debug.FRAME_COUNT + 1) % this.debug.LOG_FREQUENCY;
+            
+            if (this.debug.FRAME_COUNT === 0) {  // Only log on frame 0
+                if (this.debug.ENEMY_DEBUG) {
+                    console.log(`Enemies: ${this.enemySystem.getEnemies().length}, Wave: ${this.stateManager.getStateData().currentWave || 'None'}`);
+                }
+            }
+        }
+    
         this.energyCore.update(deltaTime, time);
         this.player.update();
         this.enemySystem.update();
         this.towerSystem.update(time, this.enemySystem.getEnemies());
         this.updateCamera();
-
-        // Check for wave completion
-        if (this.checkWaveComplete()) {
-            this.stateManager.setState(GameStates.WAVE_COMPLETE);
-        }
     }
 
     checkWaveComplete() {
@@ -224,6 +314,41 @@ export class Game {
         this.app.stage.eventMode = 'static';
         let hoveredTower = null;
         let selectedTowerType = TowerTypes.BASIC;
+
+         // Add debug test commands
+    if (this.debug.ENEMY_DEBUG || this.debug.TOWER_DEBUG) {
+        window.addEventListener('keydown', (e) => {
+            if (!this.stateManager.isPlaying()) return;
+
+            switch(e.key.toLowerCase()) {
+                case 't':  // Test spawn all enemy types
+                    console.log('Testing enemy spawns...');
+                    Object.values(ENEMY_TYPES).forEach(type => {
+                        this.enemySystem.debugSpawnEnemy(type);
+                    });
+                    break;
+                    
+                case 'l':  // Test wave manager
+                    console.log('Starting test wave...');
+                    eventManager.emit(GameEvents.WAVE_START_REQUESTED, { wave: 1 });
+                    break;
+                    
+                case 'k':  // Kill all enemies (for testing wave completion)
+                    console.log('Killing all enemies...');
+                    this.enemySystem.getEnemies().forEach(enemy => {
+                        enemy.takeDamage(9999);
+                    });
+                    break;
+                    
+                case 'r':  // Reset game state
+                    console.log('Resetting game state...');
+                    this.stateManager.setState(GameStates.MENU);
+                    this.enemySystem.clearAllEnemies();
+                    this.towerSystem.clearAllTowers();
+                    break;
+            }
+        });
+    }
 
         // Global key listener - outside of any state check
         window.addEventListener('keydown', (e) => {
@@ -323,31 +448,42 @@ export class Game {
         });
 
         // Handle click for tower placement
-        this.app.stage.on('pointertap', (event) => {
-            if (!this.stateManager.isPlaying()) return;
+    this.app.stage.on('pointertap', (event) => {
+        if (!this.stateManager.isPlaying()) return;
 
-            const worldPos = {
-                x: event.global.x - this.gameContainer.position.x,
-                y: event.global.y - this.gameContainer.position.y
-            };
-            const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
-            const stateData = this.stateManager.getStateData();
-            const towerCost = this.towerSystem.towerFactory.getTowerCost(selectedTowerType);
+        const worldPos = {
+            x: event.global.x - this.gameContainer.position.x,
+            y: event.global.y - this.gameContainer.position.y
+        };
+        const gridPos = this.gridSystem.pixelToGrid(worldPos.x, worldPos.y);
+        const stateData = this.stateManager.getStateData();
+        
+        // Get the currently selected tower type from TowerUI
+        const selectedTowerType = this.towerUI.selectedType;
+        const towerCost = this.towerSystem.getTowerCost(selectedTowerType);
 
-            if (stateData.resources >= towerCost) {
-                eventManager.emit(GameEvents.TOWER_CREATION_REQUESTED, {
-                    type: selectedTowerType,
-                    gridX: gridPos.x,
-                    gridY: gridPos.y
-                });
-            } else {
-                eventManager.emit(GameEvents.TOWER_PLACEMENT_FAILED, {
-                    reason: 'insufficient_resources',
-                    required: towerCost,
-                    current: stateData.resources
-                });
-            }
+        console.log('[Game] Attempting to place tower:', {
+            type: selectedTowerType,
+            position: gridPos,
+            cost: towerCost,
+            resources: stateData.resources
         });
+
+        if (stateData.resources >= towerCost) {
+            eventManager.emit(GameEvents.TOWER_CREATION_REQUESTED, {
+                type: selectedTowerType,
+                gridX: gridPos.x,
+                gridY: gridPos.y
+            });
+        } else {
+            eventManager.emit(GameEvents.TOWER_PLACEMENT_FAILED, {
+                reason: 'insufficient_resources',
+                required: towerCost,
+                current: stateData.resources
+            });
+        }
+    });
+
 
         // Handle pointer leaving the stage
         this.app.stage.on('pointerleave', () => {

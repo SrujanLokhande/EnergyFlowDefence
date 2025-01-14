@@ -1,4 +1,4 @@
-import { Game } from './core/game.js';
+import { Game } from './main/game.js';
 
 // Start the game
 new Game();

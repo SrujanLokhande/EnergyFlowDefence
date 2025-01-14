@@ -1,5 +1,5 @@
 import { Container, Graphics } from 'pixi.js';
-import { Tower } from '../components/tower.js';
+import { Tower } from '../components/tower/tower.js';
 import { TOWER_CONFIG, GRID_CONFIG } from '../config/gameConfig.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
@@ -23,34 +23,49 @@ export class TowerSystem {
     }
 
     setupEventListeners() {
-        // Listen for tower placement requests
+        // Single point of handling tower creation requests
         eventManager.subscribe(GameEvents.TOWER_CREATION_REQUESTED, (data) => {
-            console.log('Tower creation requested:', data);
+            console.log('[TowerSystem] Tower creation requested:', {
+                type: data.type,
+                position: { x: data.gridX, y: data.gridY }
+            });
+            
+            const towerCost = this.towerFactory.getTowerCost(data.type);
+            console.log('[TowerSystem] Tower cost:', towerCost);
+    
             if (this.canPlaceTower(data.gridX, data.gridY)) {
-                this.createTower(data.type, data.gridX, data.gridY);
+                const tower = this.createTower(data.type, data.gridX, data.gridY);
+                
+                if (tower) {
+                    // Emit a single tower placed event
+                    eventManager.emit(GameEvents.TOWER_PLACED, {
+                        tower,
+                        type: data.type,
+                        position: { x: data.gridX, y: data.gridY },
+                        cost: towerCost
+                    });
+                }
             }
         });
+    
+    
+        // Add listener for tower type selection
+        eventManager.subscribe(GameEvents.TOWER_TYPE_SELECTED, (data) => {
+            console.log('[TowerSystem] Tower type selected:', data.type);
+        });
     }
-
     addTower(tower) {
-        console.log('Adding tower to system:', tower);
+        console.log('[TowerSystem] Adding tower to system:', tower);
         const posKey = `${tower.gridPosition.x},${tower.gridPosition.y}`;
         this.towers.set(posKey, tower);
         this.container.addChild(tower.container);
-        
-        // Only emit tower placed event here
-        eventManager.emit(GameEvents.TOWER_PLACED, {
-            tower,
-            position: tower.gridPosition,
-            type: tower.type,
-            cost: this.towerFactory.getTowerCost(tower.type)
-        });
         
         // Update energy connections after adding tower
         this.updateEnergyConnections();
     }
 
     createTower(type, gridX, gridY) {
+        console.log(`[TowerSystem] Creating tower: type=${type}, gridX=${gridX}, gridY=${gridY}`);
         const tower = this.towerFactory.createTower(type, gridX, gridY);
         if (tower) {
             this.addTower(tower);
@@ -222,8 +237,11 @@ export class TowerSystem {
 
     // Add these methods to TowerSystem class
     getTowerCost(type) {
-        return this.towerFactory.getTowerCost(type);        
+        const cost = this.towerFactory.getTowerCost(type);
+        console.log('[TowerSystem] Getting tower cost:', { type, cost });
+        return cost;
     }
+    
 
     getUpgradeCost(gridX, gridY) {
         const tower = this.getTowerAt(gridX, gridY);

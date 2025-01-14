@@ -5,6 +5,13 @@ export class EventManager {
     }
 
     subscribe(eventName, callback) {
+
+        if (!this.listeners.has(eventName)) {
+            this.listeners.set(eventName, new Set());
+        }
+        console.log(`Subscribing to event: ${eventName}`); // Add debug log
+        this.listeners.get(eventName).add(callback);
+
         if (!eventName) {
             console.error('Attempted to subscribe to undefined event');
             return () => {};
@@ -26,6 +33,24 @@ export class EventManager {
             }
         };
     }
+
+    unsubscribe(eventName, callback) {
+        if (!this.listeners.has(eventName)) {
+            console.warn(`No listeners found for event: ${eventName}`);
+            return;
+        }
+    
+        const listeners = this.listeners.get(eventName);
+        if (listeners.has(callback)) {
+            listeners.delete(callback);
+            if (listeners.size === 0) {
+                this.listeners.delete(eventName); // Remove eventName entirely if no listeners are left
+            }
+            console.log(`Unsubscribed from event: ${eventName}`);
+        } else {
+            console.warn(`Listener not found for event: ${eventName}`);
+        }
+    } 
 
     emit(eventName, data) {
         if (!eventName) {
