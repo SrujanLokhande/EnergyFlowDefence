@@ -102,8 +102,7 @@ export class EnemySystem {
             );
             
             if (distance < GRID_CONFIG.CELL_SIZE) {
-                this.energyCore.takeDamage(enemy.value);
-                enemy.onDeath();
+                this.energyCore.takeDamage(enemy.value);                
                 this.removeEnemy(enemy);
             }
         }
@@ -118,9 +117,6 @@ export class EnemySystem {
     }
 
     clearAllEnemies() {
-        for (const enemy of this.enemies) {
-            enemy.onDeath();
-        }
         this.enemies.clear();
         this.container.removeChildren();
     }

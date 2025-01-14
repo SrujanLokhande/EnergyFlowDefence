@@ -30,7 +30,7 @@ export const ENEMY_CONFIG = {
     [ENEMY_TYPES.BOSS]: {
         health: 500,
         speed: 0.8,
-        value: 50,
+        value: 30,
         color: 0x9b59b6,
         size: 0.5
     }

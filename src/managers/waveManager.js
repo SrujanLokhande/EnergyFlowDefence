@@ -10,8 +10,7 @@ export class WaveManager {
 
         this.config = {
             baseEnemiesPerWave: config.baseEnemiesPerWave || 5,
-            enemiesPerWaveGrowth: config.enemiesPerWaveGrowth || 2,
-            spawnIntervalMs: config.spawnIntervalMs || 1500,
+            enemiesPerWaveGrowth: config.enemiesPerWaveGrowth || 2,           
             batchSize: config.batchSize || 2,
             waveCountdownMs: config.waveCountdownMs || 5000,
             bossWaveInterval: config.bossWaveInterval || 5,
@@ -94,15 +93,10 @@ export class WaveManager {
         const composition = this.calculateWaveComposition(waveNumber);
         this.state.remainingEnemies = composition.totalEnemies;
         this.state.totalEnemies = composition.totalEnemies;
-
-        console.log(`[WaveManager] Wave ${waveNumber} total enemies:`, composition.totalEnemies);
-
-        console.log(`[WaveManager] Wave composition:`, composition);
-
         eventManager.emit(GameEvents.WAVE_STARTED, {
             wave: waveNumber,
             composition: composition,
-        });
+        });     
 
         await this.spawnWaveEnemies(composition);
     }
@@ -152,7 +146,7 @@ export class WaveManager {
     async spawnWaveEnemies(composition) {
         const queue = this.createSpawnQueue(composition);
 
-        console.log(`[WaveManager] Spawn queue created:`, queue);
+        
 
         while (queue.length > 0 && this.state.isWaveInProgress) {
             const batch = queue.splice(0, this.config.batchSize);
@@ -172,10 +166,9 @@ export class WaveManager {
     handleEnemyDeath(data) {
         if (!this.state.isWaveInProgress) return;
 
-        this.state.remainingEnemies--;
-        console.log(`[WaveManager] Enemy died. Remaining enemies: ${this.state.remainingEnemies}`);
+        this.state.remainingEnemies--;    
         
-        if (this.state.remainingEnemies <= 0) {
+        if (this.state.remainingEnemies <= this.state.totalEnemies) {
             this.checkWaveCompletion()
         }
     }
@@ -183,9 +176,8 @@ export class WaveManager {
     checkWaveCompletion() {
         if (!this.state.isWaveInProgress) return;        
     
-        if (this.state.remainingEnemies <= 0 ) {
+        if (this.state.remainingEnemies <= 0 ) {           
             
-            console.log(`[WaveManager] Wave ${this.state.currentWave} completed.`);
     
             this.state.isWaveInProgress = false;
             const completedWave = this.state.currentWave;
@@ -202,13 +194,13 @@ export class WaveManager {
 
     startWaveCountdown(nextWaveNumber) {
         if (this.state.isCountdownActive) {
-            console.log(`[WaveManager] Countdown already in progress.`);
+            
             return;
         }
     
         this.state.isCountdownActive = true;
     
-        console.log(`[WaveManager] Starting countdown for wave ${nextWaveNumber}.`);
+        
     
         eventManager.emit(GameEvents.WAVE_COUNTDOWN_STARTED, {
             timeMs: this.config.waveCountdownMs,
@@ -218,7 +210,7 @@ export class WaveManager {
         this.timers.countdown = setTimeout(() => {
             this.state.isCountdownActive = false;
             if (this.gameStateManager.isPlaying()) {
-                console.log(`[WaveManager] Countdown finished. Starting wave ${nextWaveNumber}.`);
+                
                 eventManager.emit(GameEvents.WAVE_START_REQUESTED, {
                     wave: nextWaveNumber,
                 });

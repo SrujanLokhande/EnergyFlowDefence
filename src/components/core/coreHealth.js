@@ -28,6 +28,8 @@ export class CoreHealth {
     setupEventListeners() {
         // Listen for enemy reaching core
         eventManager.subscribe(GameEvents.ENEMY_REACHED_CORE, (data) => {
+            console.log("Enemy reached core", data);
+            console.log("Core health before damage", this.health.getHealth());
             this.takeDamage(data.damage);
         });
     }

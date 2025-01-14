@@ -112,7 +112,6 @@ export class Game {
             eventManager.subscribe(GameEvents.TOWER_PLACED, this.towerPlacedCallback);
         }
 
-        
         // Core events
         eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
             this.stateManager.setState(GameStates.GAME_OVER, {
@@ -219,9 +218,6 @@ export class Game {
     handleGameOver() {
         // Clean up or reset systems as needed
         this.enemySystem.clearAllEnemies();
-        if (this.waveManager) {
-            this.waveManager.cleanup();
-        }
         console.log('Game Over - Systems cleaned up');
     }
 
@@ -246,11 +242,6 @@ export class Game {
         this.enemySystem.update();
         this.towerSystem.update(time, this.enemySystem.getEnemies());
         this.updateCamera();
-    }
-
-    checkWaveComplete() {
-        // Add wave completion logic here
-        return false;
     }
 
     updateCamera() {
@@ -307,6 +298,11 @@ export class Game {
                     this.enemySystem.clearAllEnemies();
                     this.towerSystem.clearAllTowers();
                     break;
+
+                case 'p':  // Damage Energy Core
+                console.log('Killing the energy core');
+                this.energyCore.takeDamage(9999);                
+                break;
             }
         });
     }
