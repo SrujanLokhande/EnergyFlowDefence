@@ -88,10 +88,14 @@ export class UIManager {
             case GameStates.PAUSED:
                 this.showPauseMenu();
                 break;
-                case GameStates.GAME_OVER:
-                const stats = this.stateManager.getStateData();
-                this.gameOver.updateStats(stats);
-                this.gameOver.show();
+            case GameStates.GAME_OVER:
+            // Get the current state data before hiding screens
+            const stats = this.stateManager.getStateData();
+            console.log('Game Over Stats:', stats); // Debug log
+            
+            //this.hideAllScreens();
+            this.gameOver.updateStats(stats);
+            this.gameOver.show();
                 break;
             default:
                 break;

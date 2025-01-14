@@ -1,98 +1,87 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { 
-    DynamoDBDocumentClient, 
-    PutCommand,
-    QueryCommand,
-    ScanCommand 
-} from "@aws-sdk/lib-dynamodb";
-
-const client = new DynamoDBClient();
-const docClient = DynamoDBDocumentClient.from(client);
-
 export class GameDatabase {
     constructor() {
-        this.tableName = "Leaderboard";
+        this.apiUrl = 'https://ghodigkevg.execute-api.ap-south-1.amazonaws.com/prod/leaderboard';
     }
 
-    // Save or update player score
-    async updateScore(playerId, score) {
-        const command = new PutCommand({
-            TableName: this.tableName,
-            Item: {
-                PlayerID: playerId,
-                Score: score,
-                UpdatedAt: new Date().toISOString()
+    async makeRequest(data) {
+        try {
+            const response = await fetch(this.apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                mode: 'cors'
+            });
+    
+            // Log the raw response body for debugging:
+            const text = await response.text();
+            console.log('Raw response:', text);
+    
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
             }
-        });
-
-        try {
-            await docClient.send(command);
-            console.log("Score updated successfully");
-            return true;
+    
+            // If it's JSON, parse it:
+            const responseData = JSON.parse(text);
+            return responseData;
         } catch (error) {
-            console.error("Error updating score:", error);
-            return false;
+            console.error('Request failed:', error);
+            throw error;
         }
     }
 
-    // Get player's latest score using Query instead of Get
-    async getPlayerScore(playerId) {
-        const command = new QueryCommand({
-            TableName: this.tableName,
-            KeyConditionExpression: "PlayerID = :pid",
-            ExpressionAttributeValues: {
-                ":pid": playerId
-            },
-            Limit: 1,
-            ScanIndexForward: false // Get the highest score first
-        });
+    async updateScore(playerId, score) {
+        if (!playerId || typeof playerId !== 'string') {
+            throw new Error('Invalid player ID');
+        }
+
+        if (typeof score !== 'number' || isNaN(score)) {
+            throw new Error('Invalid score value');
+        }
 
         try {
-            const response = await docClient.send(command);
-            return response.Items?.[0]?.Score || 0;
+            const response = await this.makeRequest({
+                action: 'updateScore',
+                playerId: playerId, // This will be mapped to PlayerID in Lambda
+                score: score      // This will be mapped to Score in Lambda
+            });
+            
+            return {
+                success: true,
+                data: {
+                    PlayerID: response.PlayerID,
+                    Score: response.Score
+                }
+            };
         } catch (error) {
-            console.error("Error getting player score:", error);
-            return 0;
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 
-    // Get top scores (leaderboard)
     async getTopScores(limit = 10) {
-        const command = new ScanCommand({
-            TableName: this.tableName,
-            Limit: limit
-        });
-
         try {
-            const response = await docClient.send(command);
-            // Sort by score in descending order
-            const sortedItems = (response.Items || [])
-                .sort((a, b) => b.Score - a.Score)
-                .slice(0, limit);
-            return sortedItems;
+            const response = await this.makeRequest({
+                action: 'getTopScores',
+                limit
+            });
+            
+            // Convert the response to match the table schema casing
+            return {
+                success: true,
+                scores: response.map(score => ({
+                    PlayerID: score.PlayerID,
+                    Score: score.Score,
+                    UpdatedAt: score.UpdatedAt
+                }))
+            };
         } catch (error) {
-            console.error("Error getting leaderboard:", error);
-            return [];
-        }
-    }
-
-    // Get player's all scores
-    async getPlayerScores(playerId) {
-        const command = new QueryCommand({
-            TableName: this.tableName,
-            KeyConditionExpression: "PlayerID = :pid",
-            ExpressionAttributeValues: {
-                ":pid": playerId
-            },
-            ScanIndexForward: false // Get scores in descending order
-        });
-
-        try {
-            const response = await docClient.send(command);
-            return response.Items || [];
-        } catch (error) {
-            console.error("Error getting player scores:", error);
-            return [];
+            return {
+                success: false,
+                error: error.message,
+                scores: []
+            };
         }
     }
 }

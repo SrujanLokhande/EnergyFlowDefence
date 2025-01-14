@@ -1,10 +1,13 @@
 import { Container, Text } from 'pixi.js';
+import { GameDatabase } from '../../../services/dynamoDB.js';
+import { Leaderboard } from '../HUD/leaderboard.js';
 
 export class GameHUD {
     constructor(stateManager) {
         this.stateManager = stateManager;
         this.container = new Container();
-
+        this.gameDb = new GameDatabase();
+        
         this.setupHUDElements();
     }
 
@@ -42,12 +45,19 @@ export class GameHUD {
         });
         this.scoreText.position.set(20, 80);
 
+        // Create leaderboard
+        this.leaderboard = new Leaderboard(this.gameDb);
+        
         // Add all elements to container
         this.container.addChild(this.resourcesText);
         this.container.addChild(this.waveText);
         this.container.addChild(this.scoreText);
-    }
+        this.container.addChild(this.leaderboard.container);
 
+        // Initial positioning
+        this.resize(window.innerWidth, window.innerHeight);
+    }
+    
     updateResources(amount) {
         this.resourcesText.text = `Resources: ${amount}`;
     }
@@ -58,6 +68,8 @@ export class GameHUD {
 
     updateScore(score) {
         this.scoreText.text = `Score: ${score}`;
+        // Update DynamoDB when score changes
+        //this.updatePlayerScore(score);
     }
 
     showWaveComplete(wave) {
@@ -77,7 +89,6 @@ export class GameHUD {
         
         this.container.addChild(completionText);
         
-        // Remove after animation
         setTimeout(() => {
             completionText.destroy();
         }, 2000);
@@ -92,8 +103,21 @@ export class GameHUD {
     }
 
     resize(width, height) {
-        // Update positions based on new screen size
+        // Update text positions
         this.scoreText.position.set(width - this.scoreText.width - 20, 20);
         this.waveText.position.set(width / 2 - this.waveText.width / 2, 20);
+        
+        // Position leaderboard in top-right corner
+        this.leaderboard.setPosition(
+            width - 220,  // 200px width + 20px margin
+            60           // Below score text
+        );
+    }
+
+    destroy() {
+        if (this.leaderboard) {
+            this.leaderboard.destroy();
+        }
+        this.container.destroy({ children: true });
     }
 }

@@ -90,6 +90,9 @@ export class WaveManager {
             lastSpawnTime: Date.now(),
         };
 
+        // Update GameStateManager with current wave number
+        this.gameStateManager.updateWave(waveNumber);
+
         const composition = this.calculateWaveComposition(waveNumber);
         this.state.remainingEnemies = composition.totalEnemies;
         this.state.totalEnemies = composition.totalEnemies;
@@ -240,7 +243,7 @@ export class WaveManager {
         });
 
         this.state = {
-            currentWave: 0,
+            ...this.state,            
             isWaveInProgress: false,
             remainingEnemies: 0,
             spawnedEnemies: 0,

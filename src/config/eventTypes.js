@@ -1,4 +1,8 @@
 export const GameEvents = {    
+
+    LEADERBOARD_UPDATED: 'leaderboard:updated',
+    SCORE_SAVED: 'score:saved',
+    
     // Enemy related events
     ENEMY_CREATED: 'enemy:created',
     ENEMY_SPAWNED: 'enemy:spawned',
@@ -34,6 +38,7 @@ export const GameEvents = {
     STATE_CHANGED: 'state:changed',
     MENU_ENTERED: 'menu:entered',
     SCORE_UPDATED: 'score:updated',
+    WAVE_NUMBER_UPDATED: 'wave:numberUpdated',
 
     // Health related events
     HEALTH_INITIALIZED: 'health:initialized',

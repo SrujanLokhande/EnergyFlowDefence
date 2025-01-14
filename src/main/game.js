@@ -113,7 +113,7 @@ export class Game {
         }
 
         // Core events
-        eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
+        eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {            
             this.stateManager.setState(GameStates.GAME_OVER, {
                 reason: 'core_destroyed'
             });
@@ -175,11 +175,8 @@ export class Game {
             case GameStates.WAVE_COMPLETE:
                 console.log('Entering WAVE_COMPLETE state');
                 // Additional wave complete logic if needed
-                break;
-                
-            case GameStates.GAME_OVER:
-                this.handleGameOver();
-                break;
+                break;              
+            
         }
     }
     handleEnemyDeath(data) {
@@ -212,14 +209,8 @@ export class Game {
     resumeGameSystems() {
         // Resume any animations, timers, or systems
         this.app.ticker.start();
-    }
+    }   
 
-   
-    handleGameOver() {
-        // Clean up or reset systems as needed
-        this.enemySystem.clearAllEnemies();
-        console.log('Game Over - Systems cleaned up');
-    }
 
     update(deltaTime) {
         if (!this.stateManager.isPlaying()) return;

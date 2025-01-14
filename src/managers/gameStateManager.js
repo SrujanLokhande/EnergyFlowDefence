@@ -1,5 +1,6 @@
 import { eventManager } from './eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
+import { GameDatabase } from '../services/dynamoDB.js';
 
 // Define all possible game states
 export const GameStates = {
@@ -49,10 +50,21 @@ export class GameStateManager {
                 exit: () => this.handleWaveCompleteExit()
             },
             [GameStates.GAME_OVER]: {
-                enter: (data) => this.handleGameOverEnter(data),
+                enter: (data) => this.handleGameOver(data),
                 exit: () => this.handleGameOverExit()
             }
         };
+
+        this.gameDb = new GameDatabase();        
+    }
+
+    async getTopScores() {
+        try {
+            return await this.gameDb.getTopScores(5);
+        } catch (error) {
+            console.error('Error fetching top scores:', error);
+            return [];
+        }
     }
 
     setupTowerEventListeners() {
@@ -75,6 +87,11 @@ export class GameStateManager {
             return;
         }
 
+        // checks if we are transistioning to the same state twice
+        if (this.currentState === stateKey) {
+            console.warn(`Attempted to transition to the same state: ${stateKey}`);
+            return;
+        }
         console.log(`Transitioning from ${this.currentState} to ${stateKey}`);
 
         // Exit old state
@@ -152,8 +169,7 @@ export class GameStateManager {
     }
 
     handleWaveCompleteExit() {
-        console.log('Exiting Wave Complete State');
-        this.stateData.wave++; // Increment wave counter when leaving WAVE_COMPLETE state
+        console.log('Exiting Wave Complete State');        
         console.log(`Prepared for wave ${this.stateData.wave}`);
     }
 
@@ -161,14 +177,26 @@ export class GameStateManager {
         return this.currentState === GameStates.WAVE_COMPLETE;
     }
 
-    handleGameOverEnter(data) {
-        console.log('Game Over');
-        eventManager.emit(GameEvents.GAME_OVER, {
-            score: this.stateData.score,
-            wave: this.stateData.wave,
-            ...data
-        });
+    handleGameOver(data) {
+        const finalScore = this.stateData.score;
+        const finalWave = this.stateData.wave;
+        
+        console.log('Game Over - Final Score:', finalScore, 'Wave:', finalWave); // Debug log        
+
+        //Then save score to DynamoDB
+        const playerId = 'player_' + Date.now();
+        if (finalScore > 0) { // Only save if score is greater than 0
+            this.gameDb.updateScore(playerId, finalScore)
+                .then(response => {
+                    console.log('Score saved successfully:', response);
+                    eventManager.emit(GameEvents.LEADERBOARD_UPDATED);
+                })
+                .catch(error => {
+                    console.error('Failed to save score:', error);
+                });
+        }
     }
+
     handleGameOverExit() {
         // Reset or keep data if you want to restart
         this.stateData.score = 0;
@@ -200,6 +228,14 @@ export class GameStateManager {
             change: amount
         });
     }
+
+    updateWave(waveNumber) {
+        this.stateData.wave = waveNumber;
+        eventManager.emit(GameEvents.WAVE_NUMBER_UPDATED, {
+            wave: waveNumber
+        });
+    }
+    
     updateResources(amount) {    
         
         const newAmount = this.stateData.resources + amount;
