@@ -21,8 +21,7 @@ export class TowerFactory {
         });
     }
 
-    createTower(type, gridX, gridY) {
-        console.log('[TowerFactory] Creating tower:', { type, gridX, gridY });
+    createTower(type, gridX, gridY) {        
         const config = TowerConfigs[type];
         
         if (!config) {
@@ -44,9 +43,8 @@ export class TowerFactory {
         // Set the tower's color based on type
         if (tower.visuals) {
             tower.visuals.setColor(config.color);
-        }
-    
-        console.log('[TowerFactory] Tower created with type:', tower.type);
+        }   
+       
         return tower;
     }
 

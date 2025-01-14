@@ -60,8 +60,7 @@ export class EnemyBase {
     }
 
     // Implement Damageable interface methods
-    takeDamage(amount) {
-        console.log(`Enemy ${this.id} taking damage: ${amount}, Current health: ${this.health.getHealth()}`);
+    takeDamage(amount) {        
         const isDead = this.health.takeDamage(amount);
         
         // Emit damage event
@@ -101,13 +100,5 @@ export class EnemyBase {
             y: this.container.position.y
         };
     }
-
-    destroy() {
-        eventManager.emit(GameEvents.ENEMY_DESTROYED, {
-            id: this.id,
-            type: this.type,
-            position: this.getPosition()
-        });
-        this.container.destroy();
-    }
+    
 }

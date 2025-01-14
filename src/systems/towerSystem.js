@@ -24,14 +24,9 @@ export class TowerSystem {
 
     setupEventListeners() {
         // Single point of handling tower creation requests
-        eventManager.subscribe(GameEvents.TOWER_CREATION_REQUESTED, (data) => {
-            console.log('[TowerSystem] Tower creation requested:', {
-                type: data.type,
-                position: { x: data.gridX, y: data.gridY }
-            });
+        eventManager.subscribe(GameEvents.TOWER_CREATION_REQUESTED, (data) => {           
             
-            const towerCost = this.towerFactory.getTowerCost(data.type);
-            console.log('[TowerSystem] Tower cost:', towerCost);
+            const towerCost = this.towerFactory.getTowerCost(data.type);          
     
             if (this.canPlaceTower(data.gridX, data.gridY)) {
                 const tower = this.createTower(data.type, data.gridX, data.gridY);
@@ -50,12 +45,10 @@ export class TowerSystem {
     
     
         // Add listener for tower type selection
-        eventManager.subscribe(GameEvents.TOWER_TYPE_SELECTED, (data) => {
-            console.log('[TowerSystem] Tower type selected:', data.type);
+        eventManager.subscribe(GameEvents.TOWER_TYPE_SELECTED, (data) => {            
         });
     }
-    addTower(tower) {
-        console.log('[TowerSystem] Adding tower to system:', tower);
+    addTower(tower) {        
         const posKey = `${tower.gridPosition.x},${tower.gridPosition.y}`;
         this.towers.set(posKey, tower);
         this.container.addChild(tower.container);
@@ -64,8 +57,7 @@ export class TowerSystem {
         this.updateEnergyConnections();
     }
 
-    createTower(type, gridX, gridY) {
-        console.log(`[TowerSystem] Creating tower: type=${type}, gridX=${gridX}, gridY=${gridY}`);
+    createTower(type, gridX, gridY) {        
         const tower = this.towerFactory.createTower(type, gridX, gridY);
         if (tower) {
             this.addTower(tower);
@@ -237,8 +229,7 @@ export class TowerSystem {
 
     // Add these methods to TowerSystem class
     getTowerCost(type) {
-        const cost = this.towerFactory.getTowerCost(type);
-        console.log('[TowerSystem] Getting tower cost:', { type, cost });
+        const cost = this.towerFactory.getTowerCost(type);        
         return cost;
     }
     

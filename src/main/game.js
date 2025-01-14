@@ -103,31 +103,15 @@ export class Game {
         
     }
 
-    setupEventListeners() {
-
-        if (this.debug.LOG_EVENTS) {
-            // Debug event logging
-            eventManager.subscribe('*', (data) => {
-                const event = data.type || 'unknown';
-                console.group(`Event: ${event}`);
-                console.log('Data:', data);
-                console.log('State:', this.stateManager.getCurrentState());
-                console.groupEnd();
-            });
-        }
+    setupEventListeners() {       
 
         if (!this.towerPlacedCallback) {
             this.towerPlacedCallback = (data) => {
-                console.log(`[Game] Tower placed event handled.`);
-                // Do not handle resource deduction here
+                console.log(`[Game] Tower placed event handled.`);                
             };
             eventManager.subscribe(GameEvents.TOWER_PLACED, this.towerPlacedCallback);
         }
 
-        // Enemy combat events
-        eventManager.subscribe(GameEvents.ENEMY_DAMAGED, (data) => {
-            console.log(`Enemy ${data.id} took ${data.amount} damage. Health: ${data.currentHealth}`);
-        });
         
         // Core events
         eventManager.subscribe(GameEvents.CORE_DESTROYED, () => {
@@ -168,30 +152,16 @@ export class Game {
     
         eventManager.subscribe(GameEvents.WAVE_COMPLETED, (data) => {
             console.log(`Wave ${data.wave} completed! Next wave: ${data.nextWave}`);
-            
-            // Only transition to WAVE_COMPLETE if we're not already there
-            if (this.stateManager.getCurrentState() !== GameStates.WAVE_COMPLETE) {
-                this.stateManager.setState(GameStates.WAVE_COMPLETE);
+        
+            // Automatically transition to the next wave
+            if (this.stateManager.getCurrentState() === GameStates.WAVE_COMPLETE) {
+                eventManager.emit(GameEvents.WAVE_START_REQUESTED, { wave: data.nextWave });
             }
-        });
-    
-        eventManager.subscribe(GameEvents.WAVE_COUNTDOWN_STARTED, (data) => {
-            console.log(`Starting countdown to wave ${data.nextWave}. Time: ${data.timeMs}ms`);
-            // You could update UI here to show countdown
-        });
-    
-        eventManager.subscribe(GameEvents.WAVE_ENEMY_SPAWNED, (data) => {
-            console.log(`Spawned enemy type: ${data.type} in wave ${data.wave}`);
-        });
-    
-        // Debug logs for state changes
-        eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
-            console.log(`Game state changed: ${data.previousState} -> ${data.currentState}`);
-        });
+        });   
+
     }
 
-    handleStateChange(data) {
-        console.log(`Game state changed from ${data.previousState} to ${data.currentState}`);
+    handleStateChange(data) {      
         
         switch(data.currentState) {
             case GameStates.PLAYING:
@@ -215,16 +185,7 @@ export class Game {
     }
     handleEnemyDeath(data) {
         this.stateManager.updateScore(data.value);
-        this.stateManager.updateResources(data.value);
-        console.log(`Enemy defeated! Value: ${data.value}`);
-    }
-
-    handleTowerPlaced(data) {
-        // Deduct the tower cost from your GameStateManager's resource count
-        this.stateManager.updateResources(-data.cost);    
-        
-        const newResources = this.stateManager.getStateData().resources;
-        console.log(`Tower placed, cost: ${data.cost}, remaining resources: ${newResources}`);
+        this.stateManager.updateResources(data.value);        
     }
 
     startGame() {
@@ -356,10 +317,8 @@ export class Game {
             console.log('Current game state:', this.stateManager.getCurrentState());
 
             // Handle space bar for state changes
-            if (e.key === ' ') {
-                console.log('Space pressed');
-                const currentState = this.stateManager.getCurrentState();
-                console.log('Current state before space:', currentState);
+            if (e.key === ' ') {                
+                const currentState = this.stateManager.getCurrentState();              
                 
                 if (currentState === 'MENU') {
                     console.log('Attempting to start game from menu');
@@ -460,14 +419,7 @@ export class Game {
         
         // Get the currently selected tower type from TowerUI
         const selectedTowerType = this.towerUI.selectedType;
-        const towerCost = this.towerSystem.getTowerCost(selectedTowerType);
-
-        console.log('[Game] Attempting to place tower:', {
-            type: selectedTowerType,
-            position: gridPos,
-            cost: towerCost,
-            resources: stateData.resources
-        });
+        const towerCost = this.towerSystem.getTowerCost(selectedTowerType);       
 
         if (stateData.resources >= towerCost) {
             eventManager.emit(GameEvents.TOWER_CREATION_REQUESTED, {

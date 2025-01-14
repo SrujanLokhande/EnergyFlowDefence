@@ -56,8 +56,7 @@ export class GameStateManager {
     }
 
     setupTowerEventListeners() {
-        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {
-            console.log(`[GameStateManager] Handling tower placement.`);
+        eventManager.subscribe(GameEvents.TOWER_PLACED, (data) => {            
             const success = this.updateResources(-data.cost);
             if (success) {
                 console.log(`Resources updated. New total: ${this.stateData.resources}`);
@@ -201,20 +200,13 @@ export class GameStateManager {
             change: amount
         });
     }
-    updateResources(amount) {
-        console.log(`[GameStateManager] Updating resources:`, {
-            currentResources: this.stateData.resources,
-            changeAmount: amount,
-            newTotal: this.stateData.resources + amount,
-            stackTrace: new Error().stack
-        });
+    updateResources(amount) {    
         
         const newAmount = this.stateData.resources + amount;
         if (newAmount < 0) {
             console.warn('[GameStateManager] Attempted to set negative resources:', newAmount);
             return false;
-        }
-        
+        }        
         this.stateData.resources = newAmount;
         
         eventManager.emit(GameEvents.RESOURCES_CHANGED, {

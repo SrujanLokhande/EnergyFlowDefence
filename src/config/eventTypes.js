@@ -4,7 +4,6 @@ export const GameEvents = {
     ENEMY_SPAWNED: 'enemy:spawned',
     ENEMY_DIED: 'enemy:died',
     ENEMY_DAMAGED: 'enemy:damaged',
-    ENEMY_DESTROYED: 'enemy:destroyed', 
     ENEMY_REACHED_CORE: 'enemy:reachedCore',
     ENEMY_INITIALIZED: 'enemy:initialized',
     ENEMY_CREATION_REQUESTED: 'enemy:creationRequested',

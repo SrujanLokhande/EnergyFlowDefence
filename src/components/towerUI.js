@@ -1,6 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { BlurFilter } from '@pixi/filter-blur';
-import { Rectangle } from 'pixi.js';
 import { TowerTypes, TowerConfigs } from '../config/towerConfig.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
