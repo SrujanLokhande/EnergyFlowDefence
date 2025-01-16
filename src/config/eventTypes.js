@@ -19,12 +19,12 @@ export const GameEvents = {
     CORE_HEALED: 'core:healed',
 
     // Game state events
+    GAME_PREPARATION_STARTED: 'game:preparationStarted',
+    GAME_START_REQUESTED: 'game:startRequested',
     GAME_STARTED: 'game:started',
     GAME_PAUSED: 'game:paused',
     GAME_RESUMED: 'game:resumed',
     GAME_OVER: 'game:over',
-    WAVE_STARTED: 'wave:started',
-    WAVE_COMPLETED: 'wave:completed',
 
     // Resource events
     RESOURCES_CHANGED: 'resources:changed',
@@ -39,6 +39,8 @@ export const GameEvents = {
     MENU_ENTERED: 'menu:entered',
     SCORE_UPDATED: 'score:updated',
     WAVE_NUMBER_UPDATED: 'wave:numberUpdated',
+    TUTORIAL_REQUESTED: 'tutorial:requested',
+    RETURN_TO_MENU_REQUESTED: 'menu:returnRequested',
 
     // Health related events
     HEALTH_INITIALIZED: 'health:initialized',

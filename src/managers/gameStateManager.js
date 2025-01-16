@@ -6,6 +6,7 @@ import { GameDatabase } from '../services/dynamoDB.js';
 export const GameStates = {
     MENU: 'MENU',
     LOADING: 'LOADING',
+    PREPARING: 'PREPARING',  
     PLAYING: 'PLAYING',
     PAUSED: 'PAUSED',
     WAVE_COMPLETE: 'WAVE_COMPLETE',
@@ -184,17 +185,17 @@ export class GameStateManager {
         console.log('Game Over - Final Score:', finalScore, 'Wave:', finalWave); // Debug log        
 
         //Then save score to DynamoDB
-        const playerId = 'player_' + Date.now();
-        if (finalScore > 0) { // Only save if score is greater than 0
-            this.gameDb.updateScore(playerId, finalScore)
-                .then(response => {
-                    console.log('Score saved successfully:', response);
-                    eventManager.emit(GameEvents.LEADERBOARD_UPDATED);
-                })
-                .catch(error => {
-                    console.error('Failed to save score:', error);
-                });
-        }
+        // const playerId = 'player_' + Date.now();
+        // if (finalScore > 0) { // Only save if score is greater than 0
+        //     this.gameDb.updateScore(playerId, finalScore)
+        //         .then(response => {
+        //             console.log('Score saved successfully:', response);
+        //             eventManager.emit(GameEvents.LEADERBOARD_UPDATED);
+        //         })
+        //         .catch(error => {
+        //             console.error('Failed to save score:', error);
+        //         });
+        // }
     }
 
     handleGameOverExit() {

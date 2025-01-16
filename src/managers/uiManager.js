@@ -5,6 +5,7 @@ import { GameHUD } from '../components/UI/HUD/gameHUD.js';
 import { GameStates } from '../managers/gameStateManager.js';
 import { MainMenuScreen } from '../components/UI/mainMenuScreen.js';
 import { GameOverScreen } from '../components/UI/gameOverScreen.js';
+import { PreparationScreen } from '../components/UI/preparationScreen.js';
 
 export class UIManager {
     constructor(app, stateManager) {
@@ -27,6 +28,9 @@ export class UIManager {
         this.setupScreens();
         this.setupEventListeners();
         this.resize();
+
+        this.handleResize = this.resize.bind(this);
+        window.addEventListener('resize', this.handleResize);
     }
 
     setupScreens() {
@@ -37,10 +41,12 @@ export class UIManager {
         // Initialize new screen components
         this.mainMenu = new MainMenuScreen();
         this.gameOver = new GameOverScreen();
+        this.preparationScreen = new PreparationScreen();
         
         // Add screens to the screen layer
         this.screenLayer.addChild(this.mainMenu);
         this.screenLayer.addChild(this.gameOver);
+        this.screenLayer.addChild(this.preparationScreen);
 
         // Hide all screens initially
         this.hideAllScreens();
@@ -90,10 +96,7 @@ export class UIManager {
                 break;
             case GameStates.GAME_OVER:
             // Get the current state data before hiding screens
-            const stats = this.stateManager.getStateData();
-            console.log('Game Over Stats:', stats); // Debug log
-            
-            //this.hideAllScreens();
+            const stats = this.stateManager.getStateData();       
             this.gameOver.updateStats(stats);
             this.gameOver.show();
                 break;
@@ -106,6 +109,16 @@ export class UIManager {
         this.mainMenu.hide();
         this.gameOver.hide();
         this.gameHUD.hide();
+        this.preparationScreen.hide();
+    }
+
+    showMainMenu() {
+        this.hideAllScreens();
+        this.mainMenu.show();
+    }
+
+    showPauseMenu() {
+        console.log('Showing pause menu');
     }
 
     resize() {
@@ -116,20 +129,18 @@ export class UIManager {
         this.mainMenu?.resize(width, height);
         this.gameOver?.resize(width, height);
         this.gameHUD?.resize(width, height);
-    }
-
-    showMainMenu() {
-        this.hideAllScreens();
-        this.mainMenu.show();
-    }
-
-    showPauseMenu() {
-        // Implement pause menu
+        this.preparationScreen?.resize(width, height);
     }
 
     destroy() {
         // Clean up event listeners
         window.removeEventListener('resize', this.resize);
+
+        // Destroy all screens
+        this.mainMenu?.destroy();
+        this.gameOver?.destroy();
+        this.gameHUD?.destroy();
+        this.preparationScreen?.destroy();
         
         // Destroy all containers
         this.container.destroy({ children: true });

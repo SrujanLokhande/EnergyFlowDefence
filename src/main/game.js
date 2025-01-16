@@ -158,6 +158,15 @@ export class Game {
             }
         });   
 
+        // New preparation events
+        eventManager.subscribe(GameEvents.GAME_PREPARATION_STARTED, () => {
+            this.stateManager.setState(GameStates.PREPARING);
+        });
+
+        eventManager.subscribe(GameEvents.GAME_START_REQUESTED, () => {
+            this.startGame();
+        });
+
     }
 
     handleStateChange(data) {      
