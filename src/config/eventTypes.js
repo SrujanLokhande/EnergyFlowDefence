@@ -20,6 +20,7 @@ export const GameEvents = {
 
     // Game state events
     GAME_PREPARATION_STARTED: 'game:preparationStarted',
+    PREPARATION_COMPLETED: 'game:preparationCompleted',
     GAME_START_REQUESTED: 'game:startRequested',
     GAME_STARTED: 'game:started',
     GAME_PAUSED: 'game:paused',

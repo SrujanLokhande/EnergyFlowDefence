@@ -1,4 +1,4 @@
-import { Container, Text } from 'pixi.js';
+import { Container } from 'pixi.js';
 import { eventManager } from '../managers/eventManager.js';
 import { GameEvents } from '../config/eventTypes.js';
 import { GameHUD } from '../components/UI/HUD/gameHUD.js';
@@ -12,14 +12,12 @@ export class UIManager {
         this.app = app;
         this.stateManager = stateManager;
         
-        // Create main UI containers with different layers
         this.container = new Container();
         this.hudLayer = new Container();
         this.notificationLayer = new Container();
         this.modalLayer = new Container();
         this.screenLayer = new Container();
 
-        // Add layers in order
         this.container.addChild(this.hudLayer);
         this.container.addChild(this.notificationLayer);
         this.container.addChild(this.modalLayer);
@@ -34,36 +32,29 @@ export class UIManager {
     }
 
     setupScreens() {
-        // Initialize game HUD (keeping existing implementation)
         this.gameHUD = new GameHUD(this.stateManager);
         this.hudLayer.addChild(this.gameHUD.container);
 
-        // Initialize new screen components
         this.mainMenu = new MainMenuScreen();
         this.gameOver = new GameOverScreen();
         this.preparationScreen = new PreparationScreen();
         
-        // Add screens to the screen layer
         this.screenLayer.addChild(this.mainMenu);
         this.screenLayer.addChild(this.gameOver);
         this.screenLayer.addChild(this.preparationScreen);
 
-        // Hide all screens initially
         this.hideAllScreens();
     }
 
     setupEventListeners() {
-        // Game state events
         eventManager.subscribe(GameEvents.STATE_CHANGED, (data) => {
             this.handleStateChange(data.currentState);
         });
 
-        // Resource events
         eventManager.subscribe(GameEvents.RESOURCES_CHANGED, (data) => {
             this.gameHUD.updateResources(data.resources);
         });
 
-        // Wave events
         eventManager.subscribe(GameEvents.WAVE_STARTED, (data) => {
             this.gameHUD.updateWaveInfo(data.wave);
         });
@@ -72,21 +63,31 @@ export class UIManager {
             this.gameHUD.showWaveComplete(data.wave);
         });
 
-        // Score events
         eventManager.subscribe(GameEvents.SCORE_UPDATED, (data) => {
             this.gameHUD.updateScore(data.score);
         });
 
-        // Menu navigation events
         eventManager.subscribe(GameEvents.MENU_ENTERED, () => {
             this.showMainMenu();
+        });
+
+        // Add event listener for preparation phase
+        eventManager.subscribe(GameEvents.GAME_PREPARATION_STARTED, () => {
+            this.hideAllScreens();
+            this.preparationScreen.show();
         });
     }
 
     handleStateChange(newState) {
+        this.hideAllScreens();
+        
         switch(newState) {
             case GameStates.MENU:
                 this.mainMenu.show();
+                break;
+            case GameStates.PREPARING:
+                this.preparationScreen.show();
+                this.gameHUD.show(); // Show HUD during preparation
                 break;
             case GameStates.PLAYING:
                 this.gameHUD.show();
@@ -95,10 +96,9 @@ export class UIManager {
                 this.showPauseMenu();
                 break;
             case GameStates.GAME_OVER:
-            // Get the current state data before hiding screens
-            const stats = this.stateManager.getStateData();       
-            this.gameOver.updateStats(stats);
-            this.gameOver.show();
+                const stats = this.stateManager.getStateData();
+                this.gameOver.updateStats(stats);
+                this.gameOver.show();
                 break;
             default:
                 break;
@@ -119,6 +119,7 @@ export class UIManager {
 
     showPauseMenu() {
         console.log('Showing pause menu');
+        // Implement pause menu if needed
     }
 
     resize() {
@@ -134,7 +135,7 @@ export class UIManager {
 
     destroy() {
         // Clean up event listeners
-        window.removeEventListener('resize', this.resize);
+        window.removeEventListener('resize', this.handleResize);
 
         // Destroy all screens
         this.mainMenu?.destroy();
@@ -146,4 +147,3 @@ export class UIManager {
         this.container.destroy({ children: true });
     }
 }
-

@@ -118,6 +118,16 @@ export class Game {
                 reason: 'core_destroyed'
             });
         });
+
+        eventManager.subscribe(GameEvents.GAME_RESTART_REQUESTED, () => {
+            console.log('Game restart requested');
+            this.resetGame();
+        });
+
+        eventManager.subscribe(GameEvents.RETURN_TO_MENU_REQUESTED, () => {
+            console.log('Return to menu requested');
+            this.returnToMainMenu();
+        });
     
         // Enemy events
         eventManager.subscribe(GameEvents.ENEMY_DIED, (data) => {
@@ -172,6 +182,12 @@ export class Game {
     handleStateChange(data) {      
         
         switch(data.currentState) {
+
+            case GameStates.PREPARING:
+                console.log('Entering PREPARING state');
+                // Reset any necessary game state here
+                break;
+                
             case GameStates.PLAYING:
                 console.log('Entering PLAYING state');
                 this.resumeGameSystems();
@@ -184,7 +200,7 @@ export class Game {
             case GameStates.WAVE_COMPLETE:
                 console.log('Entering WAVE_COMPLETE state');
                 // Additional wave complete logic if needed
-                break;              
+                break;           
             
         }
     }
@@ -442,6 +458,56 @@ export class Game {
             this.towerSystem.hidePlacementPreview();
         });
     }
+
+    resetGame() {
+        console.log('Resetting game state...');
+        
+        // Clear existing game components
+        this.clearGameState();
+        
+        // Let state manager reset the core state data
+        this.stateManager.setState('GAME_OVER');  // This triggers handleGameOverExit
+        
+        // Then transition to preparing state
+        this.stateManager.setState('PREPARING');
+        
+        // Reset game components
+        this.setupSystems();
+    }
+
+    clearGameState() {
+        console.log('Clearing game state...');
+        
+        // Clear all enemies
+        this.enemySystem.clearAllEnemies();
+        
+        // Clear all towers
+        this.towerSystem.destroy();
+        
+        // Remove all containers
+        this.gameContainer.removeChildren();
+        
+        // Recreate the energy core
+        this.energyCore = new EnergyCore();
+    }
+
+    returnToMainMenu() {
+        console.log('Returning to main menu...');
+        
+        // Clear game components
+        this.clearGameState();
+        
+        // Let state manager reset the core state data
+        this.stateManager.setState('GAME_OVER');  // This triggers handleGameOverExit
+        
+        // Then transition to menu state
+        this.stateManager.setState('MENU');
+        
+        // Reset game components
+        this.setupSystems();
+    }
+
+
 
     centerView() {
         const bounds = this.gridSystem.getBounds();

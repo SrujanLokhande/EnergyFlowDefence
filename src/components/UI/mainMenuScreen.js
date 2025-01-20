@@ -44,8 +44,10 @@ export class MainMenuScreen extends BaseScreen {
     }
 
     setupEventListeners() {
+        // Modified to trigger preparation phase instead of direct game start
         this.startButton.on('pointerup', () => {
-            eventManager.emit(GameEvents.GAME_START_REQUESTED);
+            console.log('Start button clicked - initiating preparation phase');
+            eventManager.emit(GameEvents.GAME_PREPARATION_STARTED);
             this.hide();
         });
 

@@ -35,13 +35,15 @@ export class PreparationScreen extends BaseScreen {
         this.countdownText.anchor.set(0.5);
 
         // Instructions text
-        this.instructionsText = new Text('Build towers and prepare your strategy!', {
+        this.instructionsText = new Text(
+            'Build towers and prepare your strategy!\nDefend the Energy Core from incoming waves!', {
             fontFamily: 'Arial',
             fontSize: 24,
             fill: 0xFFFFFF,
             stroke: 0x000000,
             strokeThickness: 3,
-            align: 'center'
+            align: 'center',
+            lineHeight: 30
         });
         this.instructionsText.anchor.set(0.5);
 
@@ -63,7 +65,9 @@ export class PreparationScreen extends BaseScreen {
             if (remaining <= 0) {
                 // Countdown finished
                 this.hide();
+                // Emit events to start the game and first wave
                 eventManager.emit(GameEvents.GAME_START_REQUESTED);
+                eventManager.emit(GameEvents.WAVE_START_REQUESTED, { wave: 1 });
                 return;
             }
 
@@ -76,6 +80,7 @@ export class PreparationScreen extends BaseScreen {
 
     show() {
         super.show();
+        // Start countdown as soon as screen is shown
         this.startCountdown();
     }
 
@@ -94,19 +99,19 @@ export class PreparationScreen extends BaseScreen {
             // Position title
             this.title.position.set(
                 window.innerWidth / 2,
-                window.innerHeight / 2 - 100
+                window.innerHeight * 0.3
             );
 
             // Position countdown text
             this.countdownText.position.set(
                 window.innerWidth / 2,
-                window.innerHeight / 2
+                window.innerHeight * 0.45
             );
 
             // Position instructions text
             this.instructionsText.position.set(
                 window.innerWidth / 2,
-                window.innerHeight / 2 + 100
+                window.innerHeight * 0.6
             );
         }
     }

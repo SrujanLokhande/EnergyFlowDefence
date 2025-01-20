@@ -38,6 +38,10 @@ export class GameStateManager {
                 enter: () => this.handleLoadingEnter(),
                 exit: () => this.handleLoadingExit()
             },
+            [GameStates.PREPARING]: {
+                enter: () => this.handlePreparingEnter(),
+                exit: () => this.handlePreparingExit()
+            },
             [GameStates.PLAYING]: {
                 enter: () => this.handlePlayingEnter(),
                 exit: () => this.handlePlayingExit()
@@ -79,6 +83,18 @@ export class GameStateManager {
         });
     }
 
+    // New handlers for preparation state
+    handlePreparingEnter() {
+        console.log('Entering Preparation State');
+        eventManager.emit(GameEvents.GAME_PREPARATION_STARTED);
+        this.stateData.isPaused = false;
+    }
+
+    handlePreparingExit() {
+        console.log('Exiting Preparation State');
+    }
+
+
     // Transition to a new state
     setState(newState, data = {}) {
         // Convert to uppercase to match the enum
@@ -115,6 +131,10 @@ export class GameStateManager {
             currentState: this.currentState,
             data: data
         });
+    }
+
+    isPreparing() {
+        return this.currentState === GameStates.PREPARING;
     }
 
     // State handlers
@@ -198,11 +218,22 @@ export class GameStateManager {
         // }
     }
 
-    handleGameOverExit() {
-        // Reset or keep data if you want to restart
-        this.stateData.score = 0;
-        this.stateData.wave = 1;
-        this.stateData.resources = 500;
+    handleGameOverExit() {        
+        // Reset core state data
+        this.stateData = {
+            score: 0,
+            wave: 1,
+            resources: 500,
+            isPaused: false
+        };
+
+        // Emit events to update UI
+        eventManager.emit(GameEvents.SCORE_UPDATED, { score: 0 });
+        eventManager.emit(GameEvents.RESOURCES_CHANGED, { resources: 500 });
+        eventManager.emit(GameEvents.WAVE_NUMBER_UPDATED, { wave: 1 });
+        
+        console.log('Game over state exited, state data reset');
+        
     }
 
     // Utility methods
