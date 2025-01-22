@@ -1,4 +1,3 @@
-// components/ui/screens/BaseScreen.js
 import { Container, Graphics } from 'pixi.js';
 
 export class BaseScreen extends Container {
@@ -6,6 +5,7 @@ export class BaseScreen extends Container {
         super();
         this.visible = false;
         this.setupBackground();
+        this.interactive = true;  // Make all screens interactive by default
     }
 
     setupBackground() {
@@ -15,10 +15,10 @@ export class BaseScreen extends Container {
     }
 
     redrawBackground(alpha = 0.7) {
-        this.background.clear();
-        this.background.beginFill(0x000000, alpha);
-        this.background.drawRect(0, 0, window.innerWidth, window.innerHeight);
-        this.background.endFill();
+        this.background.clear()
+            .beginFill(0x000000, alpha)
+            .drawRect(0, 0, window.innerWidth, window.innerHeight)
+            .endFill();
     }
 
     show() {
@@ -30,11 +30,16 @@ export class BaseScreen extends Container {
         this.visible = false;
     }
 
-    resize() {
+    resize(width = window.innerWidth, height = window.innerHeight) {
         this.redrawBackground();
+        this.onResize(width, height);
     }
 
+    // Override this method in child classes
+    onResize(width, height) {}
+
     destroy() {
+        this.background.destroy();
         super.destroy({ children: true });
     }
 }

@@ -1,5 +1,5 @@
 export const GameEvents = {    
-
+    // Leaderboard events
     LEADERBOARD_UPDATED: 'leaderboard:updated',
     SCORE_SAVED: 'score:saved',
     
@@ -8,19 +8,15 @@ export const GameEvents = {
     ENEMY_SPAWNED: 'enemy:spawned',
     ENEMY_DIED: 'enemy:died',
     ENEMY_DAMAGED: 'enemy:damaged',
-    ENEMY_REACHED_CORE: 'enemy:reachedCore',
-    ENEMY_INITIALIZED: 'enemy:initialized',
+    ENEMY_REACHED_CORE: 'enemy:reachedCore',   
     ENEMY_CREATION_REQUESTED: 'enemy:creationRequested',
-    ENEMY_CREATION_FAILED: 'enemy:creationFailed',  
-
+    
     // Core related events
     CORE_DAMAGED: 'core:damaged',
     CORE_DESTROYED: 'core:destroyed',
-    CORE_HEALED: 'core:healed',
 
     // Game state events
-    GAME_PREPARATION_STARTED: 'game:preparationStarted',
-    PREPARATION_COMPLETED: 'game:preparationCompleted',
+    GAME_PREPARATION_STARTED: 'game:preparationStarted',    
     GAME_START_REQUESTED: 'game:startRequested',
     GAME_STARTED: 'game:started',
     GAME_PAUSED: 'game:paused',
@@ -29,11 +25,6 @@ export const GameEvents = {
 
     // Resource events
     RESOURCES_CHANGED: 'resources:changed',
-    RESOURCES_COLLECTED: 'resources:collected',
-
-    // Player events
-    PLAYER_MOVED: 'player:moved',
-    PLAYER_ACTION: 'player:action',
 
     // State events
     STATE_CHANGED: 'state:changed',
@@ -42,13 +33,11 @@ export const GameEvents = {
     WAVE_NUMBER_UPDATED: 'wave:numberUpdated',
     TUTORIAL_REQUESTED: 'tutorial:requested',
     RETURN_TO_MENU_REQUESTED: 'menu:returnRequested',
+    GAME_RESTART_REQUESTED: 'game:restartRequested',
 
     // Health related events
-    HEALTH_INITIALIZED: 'health:initialized',
     HEALTH_CHANGED: 'health:changed',
     HEALTH_DEPLETED: 'health:depleted',
-    HEALTH_SET: 'health:set',
-    MAX_HEALTH_CHANGED: 'health:maxChanged',
 
     // Tower related events
     TOWER_PLACED: 'tower:placed',
@@ -67,8 +56,5 @@ export const GameEvents = {
     WAVE_ENEMY_SPAWNED: 'wave:enemySpawned',
     WAVE_COMPLETED: 'wave:completed',
     WAVE_COUNTDOWN_STARTED: 'wave:countdownStarted',
-
-    TOWER_TYPE_SELECTED: 'TOWER_TYPE_SELECTED',
-    TOWER_SELECTED: 'TOWER_SELECTED',
-    UI_INITIALIZED: 'UI_INITIALIZED',
+    TOWER_TYPE_SELECTED: 'tower:typeSelected'  // Fixed naming convention
 };

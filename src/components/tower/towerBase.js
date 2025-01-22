@@ -32,15 +32,10 @@ export class TowerBase {
         if (this.isConnected === connected) return;
         this.isConnected = connected;
         
-        // Visual update will be handled by TowerVisuals
         eventManager.emit(GameEvents.TOWER_NETWORK_UPDATED, {
             connectedCount: this.isConnected ? 1 : 0,
             totalTowers: 1
         });
-    }
-
-    getGridPosition() {
-        return { ...this.gridPosition };
     }
 
     getPosition() {
@@ -59,13 +54,6 @@ export class TowerBase {
         return {
             x: gridX * GRID_CONFIG.CELL_SIZE + GRID_CONFIG.CELL_SIZE / 2,
             y: gridY * GRID_CONFIG.CELL_SIZE + GRID_CONFIG.CELL_SIZE / 2
-        };
-    }
-
-    getLevelInfo() {
-        return {
-            level: this.level,
-            ...this.stats
         };
     }
 

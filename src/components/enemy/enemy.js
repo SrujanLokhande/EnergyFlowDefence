@@ -2,7 +2,7 @@ import { Container } from 'pixi.js';
 import { eventManager } from '../../managers/eventManager.js';
 import { GameEvents } from '../../config/eventTypes.js';
 import { EnemyVisuals } from '../enemy/enemyVisual.js';
-import { EnemyMovement } from './enemyMovement.js';
+import { Movement } from '../movement.js';
 import { Health } from '../../components/health.js';
 import { GRID_CONFIG } from '../../config/gameConfig.js';
 
@@ -15,7 +15,7 @@ export class EnemyBase {
 
         // Initialize components
         this.visuals = new EnemyVisuals(this.container);
-        this.movement = new EnemyMovement(this.container);
+        this.movement = new Movement(this.container);
         
         // Initialize health with proper configuration
         this.health = new Health({
@@ -33,7 +33,7 @@ export class EnemyBase {
         this.container.addChild(this.health.container);
         this.container.position.set(x, y);
 
-        eventManager.emit(GameEvents.ENEMY_INITIALIZED, {
+        eventManager.emit(GameEvents.ENEMY_CREATED, {
             enemy: this,
             type: this.type,
             id: this.id,
@@ -59,11 +59,9 @@ export class EnemyBase {
         });
     }
 
-    // Implement Damageable interface methods
     takeDamage(amount) {        
         const isDead = this.health.takeDamage(amount);
         
-        // Emit damage event
         eventManager.emit(GameEvents.ENEMY_DAMAGED, {
             id: this.id,
             amount: amount,
@@ -100,5 +98,4 @@ export class EnemyBase {
             y: this.container.position.y
         };
     }
-    
 }

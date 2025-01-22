@@ -1,6 +1,6 @@
-import { Container, Text } from 'pixi.js';
+import { Text } from 'pixi.js';
 import { BaseScreen } from './baseScreen.js';
-import { UIButton } from '../UI/elements/uiButton.js';
+import { UIButton } from './elements/uiButton.js';
 import { eventManager } from '../../managers/eventManager.js';
 import { GameEvents } from '../../config/eventTypes.js';
 
@@ -8,7 +8,6 @@ export class MainMenuScreen extends BaseScreen {
     constructor() {
         super();
         this.setupElements();
-        this.setupEventListeners();
     }
 
     setupElements() {
@@ -27,24 +26,20 @@ export class MainMenuScreen extends BaseScreen {
         this.startButton = new UIButton('START GAME', {
             width: 200,
             height: 50,
-            fontSize: 24
+            fontSize: 24,
+            backgroundColor: 0x2ecc71,
+            backgroundColorHover: 0x27ae60
         });
 
         this.howToPlayButton = new UIButton('HOW TO PLAY', {
             width: 200,
             height: 50,
-            fontSize: 24
+            fontSize: 24,
+            backgroundColor: 0x3498db,
+            backgroundColorHover: 0x2980b9
         });
 
-        this.addChild(this.title);
-        this.addChild(this.startButton);
-        this.addChild(this.howToPlayButton);
-
-        this.resize();
-    }
-
-    setupEventListeners() {
-        // Modified to trigger preparation phase instead of direct game start
+        // Setup button events
         this.startButton.on('pointerup', () => {
             console.log('Start button clicked - initiating preparation phase');
             eventManager.emit(GameEvents.GAME_PREPARATION_STARTED);
@@ -54,26 +49,31 @@ export class MainMenuScreen extends BaseScreen {
         this.howToPlayButton.on('pointerup', () => {
             eventManager.emit(GameEvents.TUTORIAL_REQUESTED);
         });
+
+        // Add elements to container
+        this.addChild(this.title);
+        this.addChild(this.startButton);
+        this.addChild(this.howToPlayButton);
+
+        this.onResize(window.innerWidth, window.innerHeight);
     }
 
-    resize() {
-        super.resize();
-
-        // Center title
+    onResize(width, height) {
+        // Position title
         this.title.position.set(
-            window.innerWidth / 2,
-            window.innerHeight * 0.2
+            width / 2,
+            height * 0.2
         );
 
         // Position buttons
         this.startButton.position.set(
-            window.innerWidth / 2 - this.startButton.width / 2,
-            window.innerHeight * 0.5
+            width / 2 - this.startButton.width / 2,
+            height * 0.5
         );
 
         this.howToPlayButton.position.set(
-            window.innerWidth / 2 - this.howToPlayButton.width / 2,
-            window.innerHeight * 0.6
+            width / 2 - this.howToPlayButton.width / 2,
+            height * 0.6
         );
     }
 }
